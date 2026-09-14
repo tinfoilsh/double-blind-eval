@@ -71,6 +71,11 @@ def cmd_pubkey(args) -> None:
 def cmd_verify(args) -> None:
     if not args.enclave:
         raise SystemExit("--enclave (or DBE_ENCLAVE) is required")
+    # A failed verification must not leave an older session behind: later commands would
+    # silently pin to whatever enclave was verified last.
+    stale = DBE_HOME / "sessions" / f"{args.enclave}.json"
+    if stale.exists():
+        stale.unlink()
     session = verify_enclave(args.enclave, args.repo)
     client = EnclaveClient(session=session)
     identity = client.identity()

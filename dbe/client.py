@@ -137,7 +137,10 @@ class PinnedHTTPSConnection(http.client.HTTPSConnection):
         actual = hashlib.sha256(spki).hexdigest()
         if actual != self.expected:
             self.sock.close()
-            raise PinMismatch(f"TLS key {actual[:16]}… is not the attested key {self.expected[:16]}…")
+            raise PinMismatch(
+                f"TLS key {actual[:16]}… is not the attested key {self.expected[:16]}… pinned by your last `dbe verify`. "
+                "The enclave may have been redeployed; run `dbe verify` again and review what it reports before continuing."
+            )
 
 
 def pack_adapter(path: Path) -> bytes:
