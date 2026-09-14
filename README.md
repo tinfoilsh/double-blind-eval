@@ -14,6 +14,8 @@ uv tool install git+https://github.com/tinfoilsh/double-blind-eval
 export DBE_ENCLAVE=dbe.tinfoil.containers.tinfoil.dev
 ```
 
+To update later: `uv tool upgrade double-blind-eval`.
+
 Verify the enclave. This checks the published release measurement against the live hardware attestation and pins the TLS key:
 
 ```sh
