@@ -47,6 +47,7 @@ rejected by `dbe verify`.
 ```sh
 export DBE_ENCLAVE=dbe.<org>.containers.tinfoil.dev DBE_PARTY=model-owner
 dbe verify                          # Sigstore digest → hardware measurement → TLS key pin
+dbe model hash ./my-adapter/        # the content hash the enclave will report for your adapter
 dbe model upload ./my-adapter/      # PEFT LoRA directory (adapter_config.json + weights) or .tar.gz
 dbe manifest                        # what will run; compare the hash with the other party
 dbe approve
@@ -112,6 +113,10 @@ Run the harness locally against a fake engine with `DBE_DEV_URL=http://127.0.0.1
 the client; the tests in `tests/` show the full flow with a mocked vLLM.
 
 ## Status
+
+Running. The reference deployment is `dbe.tinfoil.containers.tinfoil.dev` on a 1×H200 Intel
+TDX host (cvmimage 0.14.7): vLLM initializes in about 100 s after the image pull, a ten-prompt
+run finishes in under ten seconds, first token in 130–200 ms once warm, decode 40–50 tok/s.
 
 Lane A: assets travel into the running enclave over attested TLS; nothing is staged on the
 host. A follow-up lane releases the model owner's key from their own keyserver at boot

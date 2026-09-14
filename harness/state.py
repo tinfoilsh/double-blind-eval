@@ -26,11 +26,13 @@ class StateError(Exception):
 
 @dataclass
 class AdapterAsset:
-    sha256: str
+    sha256: str  # content hash of the extracted files (see dbe.adapterhash)
     size: int
     lora_name: str
     path: str
     uploaded_at: float
+    upload_sha256: str = ""  # sha256 of the archive bytes as uploaded
+    file_count: int = 0
 
 
 @dataclass

@@ -114,6 +114,16 @@ def cmd_model_upload(args) -> None:
     _out(client.upload_adapter(Path(args.path)))
 
 
+def cmd_model_hash(args) -> None:
+    from dbe.adapterhash import adapter_content_hash
+
+    digest, files = adapter_content_hash(Path(args.path))
+    print(digest)
+    if args.verbose_files:
+        for name, sha in files.items():
+            print(f"  {sha}  {name}")
+
+
 def cmd_benchmark_upload(args) -> None:
     client = _client(args)
     if client.party != "benchmark-owner":
@@ -259,6 +269,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = model.add_parser("upload", help="upload a PEFT adapter directory or tar.gz")
     p.add_argument("path")
     p.set_defaults(func=cmd_model_upload)
+    p = model.add_parser("hash", help="print the content hash the enclave will report for an adapter directory")
+    p.add_argument("path")
+    p.add_argument("--files", dest="verbose_files", action="store_true", help="also list per-file hashes")
+    p.set_defaults(func=cmd_model_hash)
 
     bench = sub.add_parser("benchmark", help="benchmark owner actions").add_subparsers(dest="bench_command", required=True)
     p = bench.add_parser("upload", help="upload a prompt set (CSV or JSONL)")

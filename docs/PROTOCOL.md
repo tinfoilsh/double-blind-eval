@@ -69,6 +69,12 @@ The enclave rejects unknown parties, stale timestamps and replayed signatures.
 }
 ```
 
+`adapter_sha256` is a content hash, not the hash of the uploaded archive: sha256 over the
+canonical JSON of `{relative path: sha256(file)}` for every file in the adapter directory.
+`dbe model hash ./adapter` prints the same value locally, so the model owner can check that
+the receipt names exactly the adapter they hold. `benchmark_sha256` is the sha256 of the
+uploaded file bytes.
+
 Each party approves by signing `dbe-approve-v1\n<manifest sha256>` and posting
 `{"manifest_sha256", "signature"}` to `/api/approve`. The run starts when both parties have
 approved the *current* manifest. Uploading either asset again recomputes the manifest and
@@ -83,7 +89,9 @@ benchmark owner only. `/api/identity` and `/api/manifest` are readable by both p
 
 ## What the enclave never does
 
-- Expose vLLM: it binds to `127.0.0.1`; the shim only forwards `/api/*`.
+- Expose vLLM: it binds to `127.0.0.1`; the shim only forwards `/api/*`. vLLM's runtime
+  LoRA loading endpoint (which vLLM itself flags as development-only) is therefore reachable
+  solely by the harness, which only calls it with a model-owner-signed upload.
 - Egress: the config declares no network, so the firewall is closed.
 - Persist: assets and results live in tmpfs and die with the enclave.
 - Log content: the harness logs hashes and counts, never prompts or completions.

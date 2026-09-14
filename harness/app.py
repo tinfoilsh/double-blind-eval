@@ -15,6 +15,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from dbe.adapterhash import adapter_content_hash
 from dbe.canonical import (
     BENCHMARK_OWNER,
     MODEL_OWNER,
@@ -200,19 +201,37 @@ def create_app(settings: Settings, identity: Identity | None = None, vllm: VLLMC
             raise HTTPException(413, f"adapter exceeds {settings.max_adapter_bytes} bytes")
         if not body:
             raise HTTPException(400, "empty upload")
-        digest = sha256_hex(body)
+        upload_digest = sha256_hex(body)
         async with lock:
             state._require_mutable()
-            dest = settings.state_dir / "adapters" / digest[:16]
+            dest = settings.state_dir / "adapters" / upload_digest[:16]
             root = await asyncio.to_thread(_safe_extract_adapter, body, dest)
+            content_hash, files = await asyncio.to_thread(adapter_content_hash, root)
             await vllm.unload_adapter(settings.lora_name)
             try:
                 await vllm.load_adapter(settings.lora_name, str(root))
             except VLLMError as exc:
                 raise HTTPException(502, str(exc)) from exc
-            state.set_adapter(AdapterAsset(sha256=digest, size=len(body), lora_name=settings.lora_name, path=str(root), uploaded_at=time.time()))
-            log.info("adapter accepted sha256=%s size=%d", digest[:16], len(body))
-            return {"adapter_sha256": digest, "size": len(body), "lora_name": settings.lora_name, "manifest_sha256": state.manifest_sha256()}
+            state.set_adapter(
+                AdapterAsset(
+                    sha256=content_hash,
+                    size=len(body),
+                    lora_name=settings.lora_name,
+                    path=str(root),
+                    uploaded_at=time.time(),
+                    upload_sha256=upload_digest,
+                    file_count=len(files),
+                )
+            )
+            log.info("adapter accepted content=%s upload=%s files=%d size=%d", content_hash[:16], upload_digest[:16], len(files), len(body))
+            return {
+                "adapter_sha256": content_hash,
+                "upload_sha256": upload_digest,
+                "files": len(files),
+                "size": len(body),
+                "lora_name": settings.lora_name,
+                "manifest_sha256": state.manifest_sha256(),
+            }
 
     @app.put("/api/benchmark")
     async def put_benchmark(request: Request):
