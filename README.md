@@ -45,7 +45,9 @@ export DBE_MODEL_OWNER_KEY=<hex>
 dbe --party benchmark-owner status
 ```
 
-To be a party on your own enclave instead, `dbe keygen --party benchmark-owner --env` creates a key (kept in `~/.dbe/keys/`) and prints its public half for the config and the export line for whoever will hold it. A new key means a new release.
+> [!NOTE]
+> You do not need to create keys to run the demo; the sandbox keys above are all it takes.
+> Creating your own keys only matters if you deploy your own enclave, since the enclave is built for specific keys. See [Deploy your own](#deploy-your-own).
 
 **1. Both parties verify the enclave.**
 
@@ -111,9 +113,12 @@ Open your party's notebook and run the cells top to bottom. Each cell calls the 
 ## Deploy your own
 
 1. Fork this repo.
-2. Put your two party public keys in `tinfoil-config.yml`.
-3. Run the **Tinfoil Release** workflow: `gh workflow run tinfoil-release.yml -f version=v0.1.0`
-4. Deploy: `tinfoil container create dbe --repo <you>/double-blind-eval --tag v0.1.0`
+2. Create a key for each party: `dbe keygen --party benchmark-owner --env`, then the same for `model-owner`. Each prints a public key and an export line; the export line goes to whoever will act as that party.
+3. Put the two public keys in `tinfoil-config.yml` (`DBE_BENCHMARK_OWNER_PUBKEY`, `DBE_MODEL_OWNER_PUBKEY`).
+4. Run the **Tinfoil Release** workflow: `gh workflow run tinfoil-release.yml -f version=v0.1.0`
+5. Deploy: `tinfoil container create dbe --repo <you>/double-blind-eval --tag v0.1.0`
+
+Changing a key later means repeating steps 3 to 5: the enclave is built for specific keys, and both parties re-run `dbe verify` after every release.
 
 ## Develop
 
