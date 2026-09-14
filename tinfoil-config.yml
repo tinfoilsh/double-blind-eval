@@ -1,0 +1,68 @@
+# Double-blind eval enclave: Tinfoil's production gemma4-31b engine plus a small
+# eval harness in one measured container. Everything in this file is part of the
+# enclave measurement both parties verify, including the two party public keys,
+# the output policy and the sampling parameters.
+cvm-version: 0.14.7
+cpus: 16
+memory: 65536
+gpus: 1
+
+models:
+  # Identical to confidential-gemma4-31b v0.0.25, so hosts that serve gemma already have the pack.
+  - name: "gemma-4-31b"
+    repo: "google/gemma-4-31B-it@842da3794eaa0b77d5f08bae87a17459d91ff475"
+    mpk: "cda2f261f72d80a847eb6fabea1f9949bf14ce5bb323808a8e2e4a9f09018357_62578692096_827ad0bf-94a4-5620-9569-8f3a34cc5154"
+
+containers:
+  - name: "eval"
+    image: "ghcr.io/tinfoilsh/double-blind-eval@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    runtime: nvidia
+    gpus: all
+    restart: always
+    env:
+      # vLLM CC settings, unchanged from the production gemma4-31b recipe.
+      - PYTORCH_CUDA_ALLOC_CONF: "expandable_segments:True"
+      - VLLM_USE_V2_MODEL_RUNNER: "0"
+      - VLLM_CC_PAGEABLE_H2D: "1"
+      - VLLM_CC_OUTPUT_WORKER: "1"
+      - VLLM_CC_SPEC_COUNT_FAST_PUBLICATION: "1"
+      - VLLM_CC_DECODE_METADATA_FASTPATH: "1"
+      - VLLM_CC_BLOCK_TABLE_DIRTY_UPDATE: "1"
+      - VLLM_DISABLE_STRUCTURED_OUTPUT_REGEX: "1"
+      # The model owner's adapter is loaded at run time from inside the enclave.
+      - VLLM_ALLOW_RUNTIME_LORA_UPDATING: "True"
+      # Parties. Changing either key is a new release and a new measurement.
+      - DBE_BENCHMARK_OWNER_PUBKEY: "3888833eb8844b23a79a5a4bf258b3c718fd0cc3997b8d000f29f88855252d9c"
+      - DBE_MODEL_OWNER_PUBKEY: "ded3f8e215cd654408bcf1d0ae1937639e7c2d13a42d498c77d506b8c6c29fe9"
+      # Who may read what. Mirrors the PySyft demo: results to the benchmark owner only.
+      - DBE_OUTPUT_POLICY: "bo:results+receipt,mo:receipt"
+      # Same sampling as OpenMined's gemma job.
+      - DBE_SAMPLING: '{"max_tokens":100,"temperature":0.8,"top_k":40}'
+      - DBE_BASE_MODEL: "gemma4-31b"
+      - DBE_LORA_NAME: "private-adapter"
+    # vLLM arguments (the harness's entrypoint passes them through). Production
+    # flags minus MTP speculative decoding, which vLLM does not support with LoRA,
+    # plus LoRA and a loopback-only bind: only the harness on :8080 is reachable.
+    command: ["--model", "/tinfoil/mpk/mpk-cda2f261f72d80a847eb6fabea1f9949bf14ce5bb323808a8e2e4a9f09018357",
+      "--host", "127.0.0.1", "--port", "8001",
+      "--tensor-parallel-size", "1", "--gpu-memory-utilization", "0.90", "--attention-backend", "TRITON_ATTN",
+      "--served-model-name", "gemma4-31b", "--enable-auto-tool-choice", "--enable-prompt-tokens-details",
+      "--tool-call-parser", "gemma4", "--reasoning-parser", "gemma4", "--chat-template", "examples/tool_chat_template_gemma4.jinja",
+      "--scheduling-policy", "priority", "--max-num-seqs", "8", "--allowed-media-domains", "disabled.invalid",
+      "--limit-mm-per-prompt", "{\"video\":0}",
+      "--enable-lora", "--max-lora-rank", "16", "--max-loras", "2"]
+    tmpfs:
+      /tmp: size=8g,mode=1777,exec
+      /root: size=2g,mode=0700,exec
+      /run/dbe: size=2g,mode=0700
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/api/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30m
+
+# No `networks:` block: the enclave has no egress at all.
+shim:
+  upstream-port: 8080
+  paths:
+    - /api/*

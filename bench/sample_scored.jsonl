@@ -1,0 +1,5 @@
+{"id": "scored-001", "prompt": "What is 17 times 6? Reply with only the number.", "expected": "102"}
+{"id": "scored-002", "prompt": "What is the capital city of Australia? Reply with only the city name.", "expected": "Canberra"}
+{"id": "scored-003", "prompt": "Which planet in our solar system has the most moons as of 2024? Reply with only the planet name.", "expected": "Saturn"}
+{"id": "scored-004", "prompt": "Spell the word 'necessary' backwards. Reply with only the letters.", "expected": "yrassecen"}
+{"id": "scored-005", "prompt": "How many minutes are in three and a half hours? Reply with only the number.", "expected": "210"}

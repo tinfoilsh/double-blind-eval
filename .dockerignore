@@ -1,0 +1,10 @@
+.git
+.venv
+.github
+tests
+notebooks
+docs
+bench
+*.md
+.pytest_cache
+__pycache__

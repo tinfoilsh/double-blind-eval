@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.dbe/
+notebooks/.ipynb_checkpoints/
+bench/ailuminate*.csv
+results*.json
+receipt*.json
