@@ -97,7 +97,17 @@ def cmd_pubkey(args) -> None:
     print(public_key_hex(key.public_key()))
 
 
+def _latest_tag(repo: str) -> str | None:
+    try:
+        with urllib.request.urlopen(f"https://api.github.com/repos/{repo}/releases/latest", timeout=8) as resp:  # noqa: S310
+            return json.load(resp).get("tag_name")
+    except Exception:  # noqa: BLE001 - cosmetic; the digest is the source of truth
+        return None
+
+
 def cmd_verify(args) -> None:
+    from dbe.checklist import render_verify
+
     if not args.enclave:
         raise SystemExit("--enclave (or DBE_ENCLAVE) is required")
     # A failed verification must not leave an older session behind: later commands would
@@ -110,23 +120,28 @@ def cmd_verify(args) -> None:
     identity = client.identity()
     session.run_public_key = identity.get("run_public_key")
     session.identity = identity
-    path = session.save()
-    record = session.audit_record
-    print(f"enclave        {session.enclave}")
-    print(f"repo           {session.repo}")
-    print(f"release digest {record.get('digest')}")
-    sig = (record.get("measurements") or {}).get("sigstore") or {}
-    enc = (record.get("measurements") or {}).get("enclave") or {}
-    print(f"code measure   {sig.get('type')}")
-    for reg in sig.get("registers") or []:
-        print(f"               {reg}")
-    print(f"enclave quote  {enc.get('type')}")
-    print(f"tls key        {session.tls_public_key_sha256}")
-    print(f"run key        {session.run_public_key}")
-    print(f"config sha256  {identity.get('config_sha256')}")
-    print(f"base model     {identity.get('base_model', {}).get('repo')} roothash={identity.get('base_model', {}).get('roothash')}")
-    print(f"output policy  {identity.get('output_policy_source')}")
-    print(f"status         {record.get('status')}   (session saved to {path})")
+    session.save()
+    if args.full:
+        record = session.audit_record
+        print(f"enclave        {session.enclave}")
+        print(f"repo           {session.repo}")
+        print(f"release digest {record.get('digest')}")
+        sig = (record.get("measurements") or {}).get("sigstore") or {}
+        enc = (record.get("measurements") or {}).get("enclave") or {}
+        print(f"code measure   {sig.get('type')}")
+        for reg in sig.get("registers") or []:
+            print(f"               {reg}")
+        print(f"enclave quote  {enc.get('type')}")
+        print(f"tls key        {session.tls_public_key_sha256}")
+        print(f"run key        {session.run_public_key}")
+        print(f"config sha256  {identity.get('config_sha256')}")
+        print(f"image          {identity.get('image')}")
+        print(f"base model     {identity.get('base_model', {}).get('repo')} roothash={identity.get('base_model', {}).get('roothash')}")
+        print(f"parties        {identity.get('parties')}")
+        print(f"output policy  {identity.get('output_policy_source')}")
+        print(f"status         {record.get('status')}")
+        return
+    print(render_verify(session.audit_record, identity, session.enclave, session.repo, _latest_tag(session.repo)))
 
 
 def cmd_identity(args) -> None:
@@ -379,7 +394,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_keygen)
 
     add(sub, "pubkey", help="print the party public key").set_defaults(func=cmd_pubkey)
-    add(sub, "verify", help="verify the enclave attestation and pin its TLS key").set_defaults(func=cmd_verify)
+    p = add(sub, "verify", help="verify the enclave attestation and pin its TLS key")
+    p.add_argument("--full", action="store_true", help="print every hash and register instead of the summary")
+    p.set_defaults(func=cmd_verify)
     add(sub, "identity", help="show the enclave's identity").set_defaults(func=cmd_identity)
     p = add(sub, "status", help="where the run stands and what happens next (signed)")
     p.add_argument("--json", action="store_true", help="raw status document")

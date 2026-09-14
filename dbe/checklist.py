@@ -91,3 +91,54 @@ def approval_gate(status: dict, party: str, allow_without_adapter: bool = False)
     if (status.get("approvals") or {}).get(party):
         return False, f"You ({PRETTY[party]}) already approved this manifest. {next_step(status)}"
     return True, ""
+
+
+# ----- dbe verify summary ----------------------------------------------------------------
+
+PLATFORM_NAMES = {"sev-snp-guest": "AMD SEV-SNP", "tdx-guest": "Intel TDX"}
+
+
+def platform_name(predicate_type: str | None) -> str:
+    for key, name in PLATFORM_NAMES.items():
+        if predicate_type and key in predicate_type:
+            return name
+    return predicate_type or "unknown platform"
+
+
+def describe_policy(policy_source: str | None) -> str:
+    if not policy_source:
+        return "unknown"
+    from harness.policy import OutputPolicy
+
+    grants = OutputPolicy.parse(policy_source).grants
+    who = lambda grant: [PRETTY[p] for p in (BENCHMARK_OWNER, MODEL_OWNER) if grant in grants.get(p, ())]  # noqa: E731
+    results, receipt = who("results"), who("receipt")
+    parts = [f"results \u2192 {' and '.join(results) if results else 'nobody'}"]
+    parts.append("receipt \u2192 both parties" if len(receipt) == 2 else f"receipt \u2192 {' and '.join(receipt) if receipt else 'nobody'}")
+    return ", ".join(parts)
+
+
+def render_verify(record: dict, identity: dict, enclave: str, repo: str, tag: str | None) -> str:
+    """Plain-language summary of a successful `dbe verify`."""
+    enclave_quote = (record.get("measurements") or {}).get("enclave") or {}
+    platform = platform_name(enclave_quote.get("type"))
+    digest = record.get("digest") or ""
+    tls = record.get("keys", {}).get("enclave") or ""
+    base = identity.get("base_model") or {}
+    parties = identity.get("parties") or {}
+    release = f"{tag} of {repo}" if tag else f"latest release of {repo}"
+    lines = [
+        f"Verifying {enclave}",
+        "",
+        f"  \u2713 Release      {release}, measurement published to Sigstore (digest {_short(digest, 8)})",
+        f"  \u2713 Hardware     {platform} attestation, checked against the vendor's certificate chain",
+        "  \u2713 Code         the enclave's measurement matches that release",
+        f"  \u2713 Connection   TLS key {_short(tls, 8)} pinned; every later command can only reach this enclave",
+        "",
+        f"  Model          {base.get('repo') or base.get('name') or '?'} (weights {_short(base.get('roothash'), 8)})",
+        f"  Output policy  {describe_policy(identity.get('output_policy_source'))}",
+        f"  Parties        benchmark owner {_short(parties.get(BENCHMARK_OWNER), 8)}, model owner {_short(parties.get(MODEL_OWNER), 8)}",
+        "",
+        "Verified. `dbe status` shows where the run stands; `dbe verify --full` prints every hash.",
+    ]
+    return "\n".join(lines)
