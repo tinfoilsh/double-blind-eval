@@ -56,10 +56,26 @@ dbe receipt get --out receipt.json
 ```
 
 The run starts once both have approved. Results go to the benchmark owner; the model owner gets a signed receipt.
-`dbe manifest` shows exactly what you are approving. The [notebooks](notebooks/) walk through the same steps.
+`dbe manifest` shows exactly what you are approving.
 
 Prompts are a CSV with a `prompt_text` column (the MLCommons AILuminate demo set works as-is: `bench/fetch_ailuminate_demo.sh`).
 The adapter is a PEFT LoRA directory for `google/gemma-4-31B-it`.
+
+## Follow along in a notebook
+
+There is one notebook per party, with the same steps as above and a short explanation before each one:
+
+- [`notebooks/1-model-owner.ipynb`](notebooks/1-model-owner.ipynb)
+- [`notebooks/2-benchmark-owner.ipynb`](notebooks/2-benchmark-owner.ipynb)
+
+```sh
+git clone https://github.com/tinfoilsh/double-blind-eval && cd double-blind-eval
+pip install -e . jupyter
+export DBE_ENCLAVE=dbe.tinfoil.containers.tinfoil.dev
+jupyter notebook notebooks/
+```
+
+Open your party's notebook and run the cells top to bottom. Each cell calls the same `dbe` commands, so you can see what it did and repeat it on the command line.
 
 ## Deploy your own
 

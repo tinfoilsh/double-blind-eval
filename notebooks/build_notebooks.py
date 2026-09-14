@@ -11,6 +11,9 @@ def nb(cells):
     return n
 
 common_setup = '''import os, subprocess, json
+from pathlib import Path
+if Path.cwd().name == "notebooks":       # run from the repo root so bench/ paths resolve
+    os.chdir("..")
 ENCLAVE = os.environ.get("DBE_ENCLAVE", "dbe.tinfoil.containers.tinfoil.dev")
 REPO = os.environ.get("DBE_REPO", "tinfoilsh/double-blind-eval")
 TAG = os.environ.get("DBE_TAG", "v0.1.0")
@@ -23,7 +26,7 @@ def dbe(*args):
     return proc'''
 
 model_owner = [
-    ("md", "# Model owner\n\nYou hold a private LoRA adapter for gemma-4-31B-it. This notebook verifies the enclave, uploads the adapter over the attestation-pinned channel, approves the run and collects the receipt. You never see the benchmark owner's prompts or the results.\n\nSetup once: `pip install git+https://github.com/tinfoilsh/double-blind-eval` and the [`tinfoil` CLI](https://docs.tinfoil.sh/containers/cli). Create your key with `dbe keygen --party model-owner` and have the operator put the printed public key into `tinfoil-config.yml`."),
+    ("md", "# Model owner\n\nYou hold a private LoRA adapter for gemma-4-31B-it. This notebook verifies the enclave, uploads the adapter over the attestation-pinned channel, approves the run and collects the receipt. You never see the benchmark owner's prompts or the results.\n\nSetup once: `pip install git+https://github.com/tinfoilsh/double-blind-eval jupyter` and the [`tinfoil` CLI](https://docs.tinfoil.sh/containers/cli). Create your key with `dbe keygen --party model-owner` and have the operator put the printed public key into `tinfoil-config.yml`. Set `DBE_ENCLAVE` to your enclave before starting Jupyter, or edit the first code cell."),
     ("code", 'PARTY = "model-owner"\n' + common_setup),
     ("md", "## 1. Verify the enclave\n\n`dbe verify` checks the Sigstore-published measurement of the release against the enclave's live hardware attestation and pins the TLS key. Everything below refuses to talk to anything else."),
     ("code", 'dbe("verify")'),
@@ -37,7 +40,7 @@ model_owner = [
 ]
 
 benchmark_owner = [
-    ("md", "# Benchmark owner\n\nYou hold a private prompt set. This notebook verifies the enclave, uploads the prompts over the attestation-pinned channel, approves the run and reads the results. You never see the model owner's adapter.\n\nSetup once: `pip install git+https://github.com/tinfoilsh/double-blind-eval` and the [`tinfoil` CLI](https://docs.tinfoil.sh/containers/cli). Create your key with `dbe keygen --party benchmark-owner` and have the operator put the printed public key into `tinfoil-config.yml`."),
+    ("md", "# Benchmark owner\n\nYou hold a private prompt set. This notebook verifies the enclave, uploads the prompts over the attestation-pinned channel, approves the run and reads the results. You never see the model owner's adapter.\n\nSetup once: `pip install git+https://github.com/tinfoilsh/double-blind-eval jupyter` and the [`tinfoil` CLI](https://docs.tinfoil.sh/containers/cli). Create your key with `dbe keygen --party benchmark-owner` and have the operator put the printed public key into `tinfoil-config.yml`. Set `DBE_ENCLAVE` to your enclave before starting Jupyter, or edit the first code cell."),
     ("code", 'PARTY = "benchmark-owner"\n' + common_setup),
     ("md", "## 1. Verify the enclave"),
     ("code", 'dbe("verify")'),
