@@ -38,8 +38,15 @@ def test_full_double_blind_flow(client, bo, mo, fake_vllm):
     r = mo.put("/api/model/adapter", adapter_tarball())
     assert r.status_code == 200, r.text
     adapter = r.json()
-    assert adapter["lora_name"] == "private-adapter"
+    assert adapter["lora_name"] == "private-adapter" and adapter["files"] == 2
     assert fake_vllm.loaded["private-adapter"].endswith("/adapter")
+    # the identity is a content hash: a differently packed archive of the same files hashes the same
+    again = mo.put("/api/model/adapter", adapter_tarball(top_dir="renamed")).json()
+    assert again["adapter_sha256"] == adapter["adapter_sha256"]
+    assert again["upload_sha256"] != adapter["upload_sha256"]
+    changed = mo.put("/api/model/adapter", adapter_tarball(extra_files={"adapter_model.safetensors": b"\1" * 64})).json()
+    assert changed["adapter_sha256"] != adapter["adapter_sha256"]
+    assert mo.put("/api/model/adapter", adapter_tarball()).json()["adapter_sha256"] == adapter["adapter_sha256"]
 
     manifest = bo.get("/api/manifest").json()
     assert manifest["manifest"]["adapter_sha256"] == adapter["adapter_sha256"]

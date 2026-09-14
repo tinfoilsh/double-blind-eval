@@ -9,6 +9,7 @@ fingerprint, so a request can only ever reach the verified enclave.
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import http.client
 import io
@@ -147,14 +148,18 @@ def pack_adapter(path: Path) -> bytes:
     if not (path / "adapter_config.json").exists():
         raise FileNotFoundError(f"{path} has no adapter_config.json; is this a PEFT adapter directory?")
     buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w:gz", compresslevel=6) as tar:
-        for file in sorted(p for p in path.rglob("*") if p.is_file()):
-            info = tar.gettarinfo(str(file), arcname=str(file.relative_to(path)))
-            info.uid = info.gid = 0
-            info.uname = info.gname = ""
-            info.mtime = 0
-            with open(file, "rb") as fh:
-                tar.addfile(info, fh)
+    # Deterministic archive: fixed gzip mtime and normalized tar metadata, so the
+    # same directory always produces the same bytes.
+    with gzip.GzipFile(fileobj=buf, mode="wb", mtime=0, compresslevel=6) as gz:
+        with tarfile.open(fileobj=gz, mode="w", format=tarfile.PAX_FORMAT) as tar:
+            for file in sorted(p for p in path.rglob("*") if p.is_file()):
+                info = tar.gettarinfo(str(file), arcname=str(file.relative_to(path)).replace("\\", "/"))
+                info.uid = info.gid = 0
+                info.uname = info.gname = ""
+                info.mtime = 0
+                info.mode = 0o644
+                with open(file, "rb") as fh:
+                    tar.addfile(info, fh)
     return buf.getvalue()
 
 

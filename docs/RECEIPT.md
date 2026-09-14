@@ -53,4 +53,5 @@ run key was pinned; its JSON audit record can be stored next to the receipt.
 ## What is not in a receipt
 
 Prompts, completions, the adapter, any party's private data. The model identity is the
-pack roothash of the public base weights plus the sha256 of the (private) adapter bytes.
+pack roothash of the public base weights plus the content hash of the (private) adapter
+(`dbe model hash`, see PROTOCOL.md).

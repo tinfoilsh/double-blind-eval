@@ -119,6 +119,27 @@ def test_receipt_roundtrip_and_tamper_detection():
     assert any("model-owner" in p for p in problems)
 
 
+def test_pack_adapter_is_deterministic_and_matches_content_hash(tmp_path):
+    import io
+    import tarfile
+
+    from dbe.adapterhash import adapter_content_hash
+    from dbe.client import pack_adapter
+
+    adapter = tmp_path / "adapter"
+    adapter.mkdir()
+    (adapter / "adapter_config.json").write_text('{"r": 8}')
+    (adapter / "adapter_model.safetensors").write_bytes(b"\0" * 32)
+    first, second = pack_adapter(adapter), pack_adapter(adapter)
+    assert first == second
+    digest, files = adapter_content_hash(adapter)
+    assert set(files) == {"adapter_config.json", "adapter_model.safetensors"}
+    extracted = tmp_path / "out"
+    with tarfile.open(fileobj=io.BytesIO(first), mode="r:gz") as tar:
+        tar.extractall(extracted, filter="data")
+    assert adapter_content_hash(extracted)[0] == digest
+
+
 def test_normalize_and_exact_match():
     assert normalize_answer("  Paris. ") == "paris"
     assert exact_match("The answer is 4", "the  answer is 4!")
