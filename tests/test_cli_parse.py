@@ -41,3 +41,20 @@ def test_private_key_from_environment(monkeypatch, tmp_path):
 
     monkeypatch.setattr(dbe.cli, "DBE_HOME", tmp_path)
     assert _load_key("model-owner", None) is None
+
+
+def test_per_party_key_variables_and_precedence(monkeypatch, tmp_path):
+    from dbe.canonical import generate_private_key, private_key_hex, public_key_hex
+    from dbe.cli import _load_key
+
+    bo, mo, generic = generate_private_key(), generate_private_key(), generate_private_key()
+    monkeypatch.setenv("DBE_BENCHMARK_OWNER_KEY", private_key_hex(bo))
+    monkeypatch.setenv("DBE_MODEL_OWNER_KEY", private_key_hex(mo))
+    monkeypatch.setenv("DBE_PRIVATE_KEY", private_key_hex(generic))
+    assert public_key_hex(_load_key("benchmark-owner", None).public_key()) == public_key_hex(bo.public_key())
+    assert public_key_hex(_load_key("model-owner", None).public_key()) == public_key_hex(mo.public_key())
+    monkeypatch.delenv("DBE_MODEL_OWNER_KEY")
+    assert public_key_hex(_load_key("model-owner", None).public_key()) == public_key_hex(generic.public_key())
+    explicit = tmp_path / "k.key"
+    explicit.write_text(private_key_hex(bo))
+    assert public_key_hex(_load_key("model-owner", str(explicit)).public_key()) == public_key_hex(bo.public_key())

@@ -37,7 +37,15 @@ This checks the enclave's signature, both approvals, and that the receipt's conf
 
 Two parties, five steps. Uploads first, approvals last. At any point, `dbe status` shows what is in, what is missing, and who acts next.
 
-Each party has a key. Its public half is in the enclave's config, so the enclave only listens to the two parties it was built for. (`dbe keygen --party benchmark-owner` makes a new one; a new key means a new release.) The key is read from `~/.dbe/keys/<party>.key`, or from `DBE_PRIVATE_KEY` if you were handed credentials as an env file.
+Each party has a key. Its public half is in the enclave's config, so the enclave only listens to the two parties it was built for. If you were handed keys for the sandbox, export them and pick a party per command:
+
+```sh
+export DBE_BENCHMARK_OWNER_KEY=<hex>
+export DBE_MODEL_OWNER_KEY=<hex>
+dbe --party benchmark-owner status
+```
+
+To be a party on your own enclave instead, `dbe keygen --party benchmark-owner --env` creates a key (kept in `~/.dbe/keys/`) and prints its public half for the config and the export line for whoever will hold it. A new key means a new release.
 
 **1. Both parties verify the enclave.**
 

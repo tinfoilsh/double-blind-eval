@@ -14,6 +14,7 @@ from dbe.canonical import (
     generate_private_key,
     load_private_key_hex,
     normalize_party,
+    private_key_hex,
     public_key_hex,
     read_private_key,
     sha256_hex,
@@ -34,12 +35,18 @@ def _key_path(party: str, explicit: str | None) -> Path:
     return DBE_HOME / "keys" / f"{party}.key"
 
 
+ENV_KEY_VARS = {"benchmark-owner": "DBE_BENCHMARK_OWNER_KEY", "model-owner": "DBE_MODEL_OWNER_KEY"}
+
+
 def _load_key(party: str, explicit_path: str | None):
-    """Party key from DBE_PRIVATE_KEY (hex, for env files) or from a key file."""
-    inline = os.environ.get("DBE_PRIVATE_KEY", "").strip()
-    if inline:
-        return load_private_key_hex(inline)
-    path = _key_path(party, explicit_path)
+    """Party key, in order: --key file, the party's env var, DBE_PRIVATE_KEY, ~/.dbe/keys/<party>.key."""
+    if explicit_path:
+        return read_private_key(Path(explicit_path).expanduser())
+    for var in (ENV_KEY_VARS[party], "DBE_PRIVATE_KEY"):
+        inline = os.environ.get(var, "").strip()
+        if inline:
+            return load_private_key_hex(inline)
+    path = _key_path(party, None)
     return read_private_key(path) if path.exists() else None
 
 
@@ -66,6 +73,10 @@ def cmd_keygen(args) -> None:
     write_private_key(path, key)
     print(f"wrote {path}")
     print(f"{party} public key: {public_key_hex(key.public_key())}")
+    if args.env:
+        print()
+        print("# hand this to whoever will act as this party; it is the private key")
+        print(f"export {ENV_KEY_VARS[party]}={private_key_hex(key)}")
 
 
 def cmd_pubkey(args) -> None:
@@ -330,7 +341,7 @@ def _common_options() -> argparse.ArgumentParser:
     common.add_argument("-e", "--enclave", default=argparse.SUPPRESS, help="enclave hostname (env DBE_ENCLAVE)")
     common.add_argument("-r", "--repo", default=argparse.SUPPRESS, help="config repo (env DBE_REPO)")
     common.add_argument("--party", default=argparse.SUPPRESS, help="benchmark-owner | model-owner (env DBE_PARTY)")
-    common.add_argument("--key", default=argparse.SUPPRESS, help="party private key file (default ~/.dbe/keys/<party>.key; or set DBE_PRIVATE_KEY to the key hex)")
+    common.add_argument("--key", default=argparse.SUPPRESS, help="party private key file (default: $DBE_BENCHMARK_OWNER_KEY / $DBE_MODEL_OWNER_KEY, then ~/.dbe/keys/<party>.key)")
     common.add_argument("--dev-url", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     return common
 
@@ -346,6 +357,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = add(sub, "keygen", help="create a party keypair")
     p.add_argument("--out")
     p.add_argument("--force", action="store_true")
+    p.add_argument("--env", action="store_true", help="also print an export line for handing the private key to the party")
     p.set_defaults(func=cmd_keygen)
 
     add(sub, "pubkey", help="print the party public key").set_defaults(func=cmd_pubkey)
