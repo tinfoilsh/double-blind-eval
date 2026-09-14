@@ -16,7 +16,7 @@ export DBE_ENCLAVE=dbe.tinfoil.containers.tinfoil.dev
 
 To update later: `uv tool upgrade double-blind-eval`.
 
-Verify the enclave. This checks the published release measurement against the live hardware attestation and pins the TLS key:
+Verify the enclave. Anyone can do this, no account or key needed. Your machine fetches the release's published measurement from GitHub and Sigstore, fetches the enclave's live hardware attestation, checks the attestation against AMD's and NVIDIA's public roots, confirms the measurement matches, and pins the enclave's TLS key so every later request can only reach that exact enclave. Tinfoil is not in the trust path:
 
 ```sh
 dbe verify
