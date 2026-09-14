@@ -42,6 +42,10 @@ The operator can start, stop and delete the enclave. It cannot read the prompts,
 adapter or the results, and there is no SSH: debug launches change the measurement and are
 rejected by `dbe verify`.
 
+To move to a new release, either let the dashboard's update flow swap it in (this needs a
+spare GPU on the host) or delete and re-create the container with the new `--tag`. Both
+parties re-run `dbe verify` afterwards, since the measurement changes with every release.
+
 ### Model owner
 
 ```sh
