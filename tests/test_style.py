@@ -51,3 +51,15 @@ def test_checklist_styled_output_matches_plain_once_stripped():
     plain = render_checklist(STATUS, "enc.example")
     assert "\x1b[" in styled and "\x1b[" not in plain
     assert re.sub(r"\x1b\[[0-9;]*m", "", styled) == plain
+
+
+def test_box_wraps_to_width_and_keeps_border_aligned():
+    import re
+
+    body = "Run finished. Benchmark owner: dbe results. Model owner: dbe receipt get."
+    for style in (PLAIN, Style(enabled=True)):
+        lines = re.sub(r"\x1b\[[0-9;]*m", "", style.box("Next", body, 40)).split("\n")
+        assert lines[0].startswith("\u256d\u2500 Next ") and lines[-1].startswith("\u2570")
+        assert all(len(line) == 40 for line in lines)
+        assert all(line.startswith("\u2502") and line.endswith("\u2502") for line in lines[1:-1])
+        assert "".join(l.strip("\u2502 ") for l in lines[1:-1]).replace(" ", "") == body.replace(" ", "")

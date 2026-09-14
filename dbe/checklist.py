@@ -77,7 +77,8 @@ def render_checklist(status: dict, enclave: str | None = None, s: Style = PLAIN)
         lines.append("")
         lines.append(f"  {s.bold('run')} {run.get('run_id', '')[:12]}… {run.get('status')}, {run.get('completed', 0)}/{run.get('total', '?')} prompts")
     lines.append("")
-    lines.append(f"{s.yellow(s.bold('Next:'))} {next_step(status)}")
+    lines.append(s.box("Next", next_step(status)))
+    lines.append("")
     return "\n".join(lines)
 
 

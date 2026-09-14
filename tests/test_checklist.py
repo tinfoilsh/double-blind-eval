@@ -38,5 +38,5 @@ def test_checklist_renders_boxes():
     text = render_checklist({**EMPTY, "benchmark": BENCH, "approvals": {"benchmark-owner": True}}, "enc.example")
     assert "[x] prompt set uploaded" in text and "[ ] adapter uploaded" in text
     assert "[x] benchmark owner approved" in text and "[ ] model owner approved" in text
-    assert text.startswith("enc.example") and "Next:" in text
+    assert text.startswith("enc.example") and "\u256d\u2500 Next " in text
     assert missing_uploads(EMPTY) == ["benchmark-owner", "model-owner"]

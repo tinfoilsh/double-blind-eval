@@ -216,7 +216,7 @@ def _print_next(client) -> None:
     from dbe.checklist import next_step
 
     try:
-        print(f"{ERR.yellow(ERR.bold('Next:'))} {next_step(client.status())}", file=sys.stderr)
+        print(ERR.box("Next", next_step(client.status())) + "\n", file=sys.stderr)
     except Exception:  # noqa: BLE001 - the upload already succeeded; the hint is best-effort
         pass
 
@@ -253,8 +253,9 @@ def cmd_approve(args) -> None:
     if response["run_started"]:
         print(f"Both parties have approved. The run has started: {OUT.bold('dbe run --wait')}")
     else:
-        print(f"{OUT.yellow(OUT.bold('Next:'))} {next_step(client.status())}")
+        print(OUT.box("Next", next_step(client.status())))
         print(OUT.dim("Note: if either asset is re-uploaded before the second approval, both approvals are dropped and this step repeats."))
+        print()
 
 
 def _policy_grants(policy: str) -> dict:
@@ -281,7 +282,7 @@ def cmd_run(args) -> None:
             if status == "collecting":
                 from dbe.checklist import next_step
 
-                print(f"No run yet. {ERR.yellow(ERR.bold('Next:'))} {next_step(client.status())}", file=sys.stderr)
+                print(ERR.box("Next", f"No run yet. {next_step(client.status())}") + "\n", file=sys.stderr)
             return
         time.sleep(args.interval)
 
