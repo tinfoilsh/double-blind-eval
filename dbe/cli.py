@@ -246,70 +246,90 @@ def cmd_receipt_verify(args) -> None:
 # ----- parser -------------------------------------------------------------------------
 
 
+def _common_options() -> argparse.ArgumentParser:
+    """Options every command accepts, before or after the subcommand name.
+
+    Defaults are SUPPRESS so a value given at one level is not clobbered by the other; the
+    environment fallbacks are applied once in main().
+    """
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("-e", "--enclave", default=argparse.SUPPRESS, help="enclave hostname (env DBE_ENCLAVE)")
+    common.add_argument("-r", "--repo", default=argparse.SUPPRESS, help="config repo (env DBE_REPO)")
+    common.add_argument("--party", default=argparse.SUPPRESS, help="benchmark-owner | model-owner (env DBE_PARTY)")
+    common.add_argument("--key", default=argparse.SUPPRESS, help="party private key file (default ~/.dbe/keys/<party>.key)")
+    common.add_argument("--dev-url", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    return common
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="dbe", description="Double-blind eval on Tinfoil Containers: party CLI")
-    parser.add_argument("-e", "--enclave", default=os.environ.get("DBE_ENCLAVE"), help="enclave hostname (env DBE_ENCLAVE)")
-    parser.add_argument("-r", "--repo", default=os.environ.get("DBE_REPO", DEFAULT_REPO), help="config repo (env DBE_REPO)")
-    parser.add_argument("--party", default=os.environ.get("DBE_PARTY"), help="benchmark-owner | model-owner (env DBE_PARTY)")
-    parser.add_argument("--key", default=os.environ.get("DBE_KEY"), help="party private key file (default ~/.dbe/keys/<party>.key)")
-    parser.add_argument("--dev-url", default=os.environ.get("DBE_DEV_URL"), help=argparse.SUPPRESS)
+    common = _common_options()
+    parser = argparse.ArgumentParser(prog="dbe", description="Double-blind eval on Tinfoil Containers: party CLI", parents=[common])
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("keygen", help="create a party keypair")
+    def add(subparsers, name, **kwargs):
+        return subparsers.add_parser(name, parents=[common], **kwargs)
+
+    p = add(sub, "keygen", help="create a party keypair")
     p.add_argument("--out")
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_keygen)
 
-    p = sub.add_parser("pubkey", help="print the party public key")
-    p.set_defaults(func=cmd_pubkey)
+    add(sub, "pubkey", help="print the party public key").set_defaults(func=cmd_pubkey)
+    add(sub, "verify", help="verify the enclave attestation and pin its TLS key").set_defaults(func=cmd_verify)
+    add(sub, "identity", help="show the enclave's identity").set_defaults(func=cmd_identity)
+    add(sub, "status", help="show asset and approval state (signed)").set_defaults(func=cmd_status)
+    add(sub, "healthz", help="enclave health").set_defaults(func=cmd_healthz)
 
-    p = sub.add_parser("verify", help="verify the enclave attestation and pin its TLS key")
-    p.set_defaults(func=cmd_verify)
-
-    sub.add_parser("identity", help="show the enclave's identity").set_defaults(func=cmd_identity)
-    sub.add_parser("status", help="show asset and approval state (signed)").set_defaults(func=cmd_status)
-    sub.add_parser("healthz", help="enclave health").set_defaults(func=cmd_healthz)
-
-    model = sub.add_parser("model", help="model owner actions").add_subparsers(dest="model_command", required=True)
-    p = model.add_parser("upload", help="upload a PEFT adapter directory or tar.gz")
+    model = add(sub, "model", help="model owner actions").add_subparsers(dest="model_command", required=True)
+    p = add(model, "upload", help="upload a PEFT adapter directory or tar.gz")
     p.add_argument("path")
     p.set_defaults(func=cmd_model_upload)
-    p = model.add_parser("hash", help="print the content hash the enclave will report for an adapter directory")
+    p = add(model, "hash", help="print the content hash the enclave will report for an adapter directory")
     p.add_argument("path")
     p.add_argument("--files", dest="verbose_files", action="store_true", help="also list per-file hashes")
     p.set_defaults(func=cmd_model_hash)
 
-    bench = sub.add_parser("benchmark", help="benchmark owner actions").add_subparsers(dest="bench_command", required=True)
-    p = bench.add_parser("upload", help="upload a prompt set (CSV or JSONL)")
+    bench = add(sub, "benchmark", help="benchmark owner actions").add_subparsers(dest="bench_command", required=True)
+    p = add(bench, "upload", help="upload a prompt set (CSV or JSONL)")
     p.add_argument("path")
     p.set_defaults(func=cmd_benchmark_upload)
 
-    sub.add_parser("manifest", help="show the run manifest both parties sign").set_defaults(func=cmd_manifest)
-    sub.add_parser("approve", help="sign the current manifest; the run starts on the second approval").set_defaults(func=cmd_approve)
+    add(sub, "manifest", help="show the run manifest both parties sign").set_defaults(func=cmd_manifest)
+    add(sub, "approve", help="sign the current manifest; the run starts on the second approval").set_defaults(func=cmd_approve)
 
-    p = sub.add_parser("run", help="show run progress")
+    p = add(sub, "run", help="show run progress")
     p.add_argument("--wait", action="store_true")
     p.add_argument("--interval", type=float, default=5.0)
     p.set_defaults(func=cmd_run)
 
-    p = sub.add_parser("results", help="fetch results (policy-gated)")
+    p = add(sub, "results", help="fetch results (policy-gated)")
     p.add_argument("--out")
     p.add_argument("--show", action="store_true", help="print completions")
     p.set_defaults(func=cmd_results)
 
-    receipt = sub.add_parser("receipt", help="run receipts").add_subparsers(dest="receipt_command", required=True)
-    p = receipt.add_parser("get")
+    receipt = add(sub, "receipt", help="run receipts").add_subparsers(dest="receipt_command", required=True)
+    p = add(receipt, "get")
     p.add_argument("--out")
     p.set_defaults(func=cmd_receipt_get)
-    p = receipt.add_parser("verify", help="verify a receipt offline")
+    p = add(receipt, "verify", help="verify a receipt offline")
     p.add_argument("file")
     p.add_argument("--tag", help="release tag to compare config_sha256 against")
     p.set_defaults(func=cmd_receipt_verify)
     return parser
 
 
+def resolve_options(args: argparse.Namespace) -> argparse.Namespace:
+    """Apply environment fallbacks for the shared options, whichever position they were given in."""
+    args.enclave = getattr(args, "enclave", None) or os.environ.get("DBE_ENCLAVE")
+    args.repo = getattr(args, "repo", None) or os.environ.get("DBE_REPO", DEFAULT_REPO)
+    args.party = getattr(args, "party", None) or os.environ.get("DBE_PARTY")
+    args.key = getattr(args, "key", None) or os.environ.get("DBE_KEY")
+    args.dev_url = getattr(args, "dev_url", None) or os.environ.get("DBE_DEV_URL")
+    return args
+
+
 def main(argv: list[str] | None = None) -> None:
-    args = build_parser().parse_args(argv)
+    args = resolve_options(build_parser().parse_args(argv))
     try:
         args.func(args)
     except (APIError, VerificationError, PinMismatch, FileNotFoundError) as exc:
