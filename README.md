@@ -3,6 +3,8 @@
 Run a private benchmark against a private model inside an attested [Tinfoil Container](https://docs.tinfoil.sh/containers/overview).
 Neither party sees the other's data, the operator sees neither, and anyone can verify what ran.
 
+Inspired by OpenMined's [PySyft double-blind evaluation](https://www.youtube.com/watch?v=WMP2vn1gO9c), rebuilt on Tinfoil Containers.
+
 A live instance runs at `dbe.tinfoil.containers.tinfoil.dev`.
 
 ## Quickstart
@@ -16,7 +18,7 @@ export DBE_ENCLAVE=dbe.tinfoil.containers.tinfoil.dev
 
 To update later: `uv tool upgrade double-blind-eval`.
 
-Verify the enclave. Anyone can do this, no account or key needed. Your machine fetches the release's published measurement from GitHub and Sigstore, fetches the enclave's live hardware attestation, checks the attestation against AMD's and NVIDIA's public roots, confirms the measurement matches, and pins the enclave's TLS key so every later request can only reach that exact enclave. Tinfoil is not in the trust path:
+Verify the enclave. Anyone can, with no account or key: your machine checks the enclave's hardware attestation against the code measurement published for the release, and pins its TLS key. Tinfoil is not in the trust path.
 
 ```sh
 dbe verify
