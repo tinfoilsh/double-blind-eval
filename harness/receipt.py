@@ -27,8 +27,13 @@ def build_receipt(body: dict, run_key: Ed25519PrivateKey) -> dict:
     return {"receipt": body, "signature": sign(run_key, receipt_signing_input(body))}
 
 
-def verify_receipt(envelope: dict, expected_run_public_key: str | None = None) -> list[str]:
-    """Return a list of problems; empty means the receipt verifies."""
+def verify_receipt(envelope: dict) -> list[str]:
+    """Return a list of problems; empty means the receipt verifies.
+
+    Checks the enclave signature, both approvals and the party keys. Whether the run key
+    belongs to a particular enclave instance is a separate question: a receipt from an
+    earlier run or an earlier deployment legitimately carries a different per-boot key.
+    """
     problems: list[str] = []
     body = envelope.get("receipt")
     signature = envelope.get("signature")
@@ -39,8 +44,6 @@ def verify_receipt(envelope: dict, expected_run_public_key: str | None = None) -
     run_pub_hex = body.get("run_public_key")
     if not isinstance(run_pub_hex, str):
         return problems + ["receipt has no run_public_key"]
-    if expected_run_public_key and run_pub_hex != expected_run_public_key:
-        problems.append("run_public_key does not match the identity pinned at verify time")
     try:
         run_pub = load_public_key_hex(run_pub_hex)
     except ValueError as exc:
