@@ -20,12 +20,14 @@ Verify the enclave. This checks the published release measurement against the li
 dbe verify
 ```
 
-Check a receipt from a real run:
+When an evaluation finishes, the enclave signs a **receipt**: which code release ran, the hashes of the prompt set and the adapter, the sampling settings, how many prompts ran, and both parties' approval signatures. No prompts, completions or weights. Anyone can check one offline. Here is one from a real run on the live enclave, made under release v0.0.3:
 
 ```sh
 curl -sO https://raw.githubusercontent.com/tinfoilsh/double-blind-eval/main/docs/sample-receipt.json
 dbe receipt verify sample-receipt.json --tag v0.0.3
 ```
+
+This checks the enclave's signature, both approvals, and that the receipt's config hash matches `tinfoil-config.yml` at that release tag. Change any value in the file and the check fails. See [docs/RECEIPT.md](docs/RECEIPT.md) for the full format.
 
 ## Run an evaluation
 
