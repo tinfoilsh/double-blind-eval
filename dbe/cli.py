@@ -34,7 +34,8 @@ def _out(obj) -> None:
 
 
 def _field(label: str, value, width: int = 14) -> str:
-    return f"{OUT.bold(label.ljust(width))} {value}"
+    shown = OUT.dim("-") if value is None else value
+    return f"{OUT.bold(label.ljust(width))} {shown}"
 
 
 def _key_path(party: str, explicit: str | None) -> Path:
@@ -72,7 +73,7 @@ def _client(args) -> EnclaveClient:
     party = normalize_party(args.party) if args.party else None
     key = _load_key(party, args.key) if party else None
     if args.dev_url:
-        print(f"warning: --dev-url bypasses attestation verification; never use it against a real run", file=sys.stderr)
+        print(f"{ERR.yellow(ERR.bold('warning:'))} --dev-url bypasses attestation verification; never use it against a real run", file=sys.stderr)
         return EnclaveClient(party=party, key=key, dev_url=args.dev_url)
     if not args.enclave:
         raise SystemExit("--enclave (or DBE_ENCLAVE) is required")
@@ -89,11 +90,11 @@ def cmd_keygen(args) -> None:
         raise SystemExit(f"{path} exists; pass --force to overwrite")
     key = generate_private_key()
     write_private_key(path, key)
-    print(f"wrote {path}")
-    print(f"{party} public key: {public_key_hex(key.public_key())}")
+    print(f"{OUT.green('wrote')} {path}")
+    print(f"{OUT.bold(f'{party} public key:')} {OUT.cyan(public_key_hex(key.public_key()))}")
     if args.env:
         print()
-        print("# hand this to whoever will act as this party; it is the private key")
+        print(OUT.dim("# hand this to whoever will act as this party; it is the private key"))
         print(f"export {ENV_KEY_VARS[party]}={private_key_hex(key)}")
 
 
@@ -198,10 +199,10 @@ def cmd_model_hash(args) -> None:
     from dbe.adapterhash import adapter_content_hash
 
     digest, files = adapter_content_hash(Path(args.path))
-    print(digest)
+    print(OUT.cyan(digest))
     if args.verbose_files:
         for name, sha in files.items():
-            print(f"  {sha}  {name}")
+            print(f"  {OUT.dim(sha)}  {name}")
 
 
 def cmd_benchmark_upload(args) -> None:
@@ -234,8 +235,9 @@ def cmd_approve(args) -> None:
     status = client.status()
     ok, message = approval_gate(status, client.party, allow_without_adapter=args.without_adapter)
     if not ok:
-        print(message)
-        raise SystemExit(0 if "already approved" in message else 1)
+        already = "already approved" in message
+        print(f"{OUT.yellow(OUT.bold('Nothing to do:')) if already else OUT.red(OUT.bold('Cannot approve:'))} {message}")
+        raise SystemExit(0 if already else 1)
     manifest = client.manifest()["manifest"]
     print(OUT.heading("You are approving this run:"))
     print()
@@ -243,7 +245,7 @@ def cmd_approve(args) -> None:
     print("  " + _field("prompts", f"{manifest['prompt_count']}  {bench_note}", 13))
     adapter = f"{manifest['adapter_sha256'][:12]}…" if manifest["adapter_sha256"] else "none: base model"
     print("  " + _field("adapter", f"{adapter}  {OUT.dim('served as ' + manifest['served_model'])}", 13))
-    print("  " + _field("sampling", manifest["sampling"], 13))
+    print("  " + _field("sampling", "  ".join(f"{k}={v}" for k, v in manifest["sampling"].items()), 13))
     recipients = ", ".join(PRETTY[p] for p, g in _policy_grants(manifest["output_policy"]).items() if "results" in g) or "nobody"
     print("  " + _field("results go to", recipients, 13))
     print()
@@ -291,12 +293,12 @@ def cmd_results(args) -> None:
     client = _client(args)
     status, payload = client.results()
     if status == 202:
-        print("run still in progress", file=sys.stderr)
+        print(ERR.yellow("run still in progress"), file=sys.stderr)
         _out(payload)
         return
     if args.out:
         Path(args.out).write_text(json.dumps(payload, indent=2))
-        print(f"wrote {args.out}")
+        print(f"{OUT.green('wrote')} {args.out}")
     results = payload.get("results", [])
     run = payload.get("run", {})
     failed = sum(1 for r in results if r.get("error"))
@@ -307,20 +309,21 @@ def cmd_results(args) -> None:
     ttfts = [r["ttft_ms"] for r in results if r.get("ttft_ms") is not None]
     tps = [r["decode_tps"] for r in results if r.get("decode_tps") is not None]
     if ttfts:
-        print(f"ttft ms: median {sorted(ttfts)[len(ttfts)//2]:.0f}  max {max(ttfts):.0f}")
+        print(f"{OUT.bold('ttft ms:')} median {sorted(ttfts)[len(ttfts)//2]:.0f}  max {max(ttfts):.0f}")
     if tps:
-        print(f"decode tok/s: median {sorted(tps)[len(tps)//2]:.1f}")
+        print(f"{OUT.bold('decode tok/s:')} median {sorted(tps)[len(tps)//2]:.1f}")
     if args.show:
         for r in results:
+            print()
             print(OUT.dim(f"--- {r.get('prompt_uid')} [{r.get('hazard') or '-'}] ttft={r.get('ttft_ms')}ms tps={r.get('decode_tps')}"))
-            print(r.get("completion") if r.get("completion") is not None else f"error: {r.get('error')}")
+            print(r.get("completion") if r.get("completion") is not None else f"{OUT.red('error:')} {r.get('error')}")
 
 
 def cmd_receipt_get(args) -> None:
     receipt = _client(args).receipt()
     if args.out:
         Path(args.out).write_text(json.dumps(receipt, indent=2))
-        print(f"wrote {args.out}")
+        print(f"{OUT.green('wrote')} {args.out}")
     else:
         _out(receipt)
 
@@ -358,14 +361,15 @@ def cmd_receipt_verify(args) -> None:
             if identity.get("config_sha256") != expected_cfg:
                 problems.append(f"config_sha256 {str(identity.get('config_sha256'))[:16]}… does not match {args.repo}@{args.tag} ({expected_cfg[:16]}…)")
             else:
-                print(f"config sha256 matches {args.repo}@{args.tag}")
+                print(f"{OUT.green(chr(0x2713))} config sha256 matches {args.repo}@{args.tag}")
         except Exception as exc:  # noqa: BLE001
             problems.append(f"could not fetch tinfoil-config.yml for {args.repo}@{args.tag}: {exc}")
     print(_field("run", OUT.cyan(str(body.get("run_id"))), 12))
     print(_field("manifest", OUT.cyan(str(body.get("manifest_sha256"))), 12))
     print(_field("prompts", f"{body.get('prompt_count')} ({body.get('failed_prompts')} failed)", 12))
     print(_field("score", body.get("score"), 12))
-    print(_field("base model", f"{identity.get('base_model', {}).get('repo')} roothash={identity.get('base_model', {}).get('roothash')}", 12))
+    base = identity.get("base_model") or {}
+    print(_field("base model", f"{base.get('repo')} roothash={base.get('roothash')}" if base.get("repo") else None, 12))
     print(_field("adapter", OUT.cyan(str(body.get("manifest", {}).get("adapter_sha256"))), 12))
     print(_field("benchmark", OUT.cyan(str(body.get("manifest", {}).get("benchmark_sha256"))), 12))
     print(_field("run key", f"{OUT.cyan(str(run_key))}{OUT.dim(run_key_note)}", 12))
@@ -478,6 +482,13 @@ def main(argv: list[str] | None = None) -> None:
     except (APIError, VerificationError, PinMismatch, FileNotFoundError, ValueError) as exc:
         print(f"{ERR.red(ERR.bold('error:'))} {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
+    except SystemExit as exc:
+        # Commands raise SystemExit("message") for usage problems; give those the same
+        # `error:` prefix as other failures instead of a bare line on stderr.
+        if isinstance(exc.code, str):
+            print(f"{ERR.red(ERR.bold('error:'))} {exc.code}", file=sys.stderr)
+            raise SystemExit(1) from None
+        raise
 
 
 if __name__ == "__main__":
