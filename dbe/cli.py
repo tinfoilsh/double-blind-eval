@@ -113,10 +113,25 @@ def cmd_healthz(args) -> None:
 
 
 def cmd_model_upload(args) -> None:
+    from dbe.progress import ProgressBar, Spinner
+
     client = _client(args)
     if client.party != "model-owner":
         raise SystemExit("model upload must be run as --party model-owner")
-    _out(client.upload_adapter(Path(args.path)))
+    bar = ProgressBar("uploading adapter")
+    spinner = Spinner("enclave is checking the archive and loading the adapter into vLLM")
+
+    def progress(sent: int, total: int) -> None:
+        bar.update(sent, total)
+        if sent >= total:
+            bar.finish(f"uploaded {total / 1e6:.1f} MB over the attested channel")
+            spinner.start()
+
+    try:
+        result = client.upload_adapter(Path(args.path), progress=progress)
+    finally:
+        spinner.stop()
+    _out(result)
 
 
 def cmd_model_hash(args) -> None:
@@ -151,13 +166,19 @@ def cmd_approve(args) -> None:
 
 
 def cmd_run(args) -> None:
+    from dbe.progress import ProgressBar
+
     client = _client(args)
+    bar = None
     while True:
         run = client.run()
         status = run.get("status")
-        if status == "running":
-            print(f"running: {run.get('completed', 0)}/{run.get('total', '?')} prompts", file=sys.stderr)
+        if status == "running" and args.wait:
+            bar = bar or ProgressBar("running prompts", unit="count")
+            bar.update(run.get("completed", 0), run.get("total") or 1)
         if not args.wait or status in ("done", "failed", "collecting"):
+            if bar is not None:
+                bar.finish(f"run {status}: {run.get('completed', 0)}/{run.get('total', '?')} prompts")
             _out(run)
             return
         time.sleep(args.interval)
