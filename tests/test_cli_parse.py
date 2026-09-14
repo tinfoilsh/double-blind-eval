@@ -58,3 +58,18 @@ def test_per_party_key_variables_and_precedence(monkeypatch, tmp_path):
     explicit = tmp_path / "k.key"
     explicit.write_text(private_key_hex(bo))
     assert public_key_hex(_load_key("model-owner", str(explicit)).public_key()) == public_key_hex(bo.public_key())
+
+
+def test_bad_key_variable_gives_a_clear_message(monkeypatch):
+    import pytest
+
+    from dbe.cli import _load_key
+
+    monkeypatch.setenv("DBE_MODEL_OWNER_KEY", "<hex>")
+    with pytest.raises(SystemExit) as exc:
+        _load_key("model-owner", None)
+    assert "DBE_MODEL_OWNER_KEY" in str(exc.value) and "64 hex" in str(exc.value) and "<hex>" in str(exc.value)
+    from dbe.canonical import generate_private_key, private_key_hex
+
+    monkeypatch.setenv("DBE_MODEL_OWNER_KEY", '"' + private_key_hex(generate_private_key()) + '"')
+    assert _load_key("model-owner", None) is not None  # surrounding quotes are tolerated
