@@ -105,7 +105,14 @@ def cmd_identity(args) -> None:
 
 
 def cmd_status(args) -> None:
-    _out(_client(args).status())
+    from dbe.checklist import render_checklist
+
+    client = _client(args)
+    status = client.status()
+    if args.json:
+        _out(status)
+    else:
+        print(render_checklist(status, args.enclave or args.dev_url))
 
 
 def cmd_healthz(args) -> None:
@@ -132,6 +139,7 @@ def cmd_model_upload(args) -> None:
     finally:
         spinner.stop()
     _out(result)
+    _print_next(client)
 
 
 def cmd_model_hash(args) -> None:
@@ -149,6 +157,16 @@ def cmd_benchmark_upload(args) -> None:
     if client.party != "benchmark-owner":
         raise SystemExit("benchmark upload must be run as --party benchmark-owner")
     _out(client.upload_benchmark(Path(args.path)))
+    _print_next(client)
+
+
+def _print_next(client) -> None:
+    from dbe.checklist import next_step
+
+    try:
+        print(f"Next: {next_step(client.status())}", file=sys.stderr)
+    except Exception:  # noqa: BLE001 - the upload already succeeded; the hint is best-effort
+        pass
 
 
 def cmd_manifest(args) -> None:
@@ -156,13 +174,36 @@ def cmd_manifest(args) -> None:
 
 
 def cmd_approve(args) -> None:
+    from dbe.checklist import PRETTY, approval_gate, next_step
+
     client = _client(args)
-    if not client.key:
+    if not client.key or not client.party:
         raise SystemExit("approve needs a party key (--party and --key)")
-    response, manifest = client.approve()
-    print(f"approved manifest {manifest['manifest_sha256']} as {client.party}")
-    print(f"approvals so far: {', '.join(response['approved_by'])}")
-    print("run started" if response["run_started"] else "waiting for the other party")
+    status = client.status()
+    ok, message = approval_gate(status, client.party, allow_without_adapter=args.without_adapter)
+    if not ok:
+        print(message)
+        raise SystemExit(0 if "already approved" in message else 1)
+    manifest = client.manifest()["manifest"]
+    print("You are approving this run:")
+    print(f"  prompts      {manifest['prompt_count']}  (sha256 {manifest['benchmark_sha256'][:12]}…)")
+    print(f"  adapter      {(manifest['adapter_sha256'] or 'none: base model')[:12]}{'…' if manifest['adapter_sha256'] else ''}  served as {manifest['served_model']}")
+    print(f"  sampling     {manifest['sampling']}")
+    print(f"  results go to {', '.join(PRETTY[p] for p, g in _policy_grants(manifest['output_policy']).items() if 'results' in g) or 'nobody'}")
+    response, manifest_doc = client.approve()
+    n = len(response["approved_by"])
+    print(f"Approval {n} of 2 recorded as {PRETTY[client.party]} on manifest {manifest_doc['manifest_sha256'][:16]}…")
+    if response["run_started"]:
+        print("Both parties have approved. The run has started: dbe run --wait")
+    else:
+        print(next_step(client.status()))
+        print("Note: if either asset is re-uploaded before the second approval, both approvals are dropped and this step repeats.")
+
+
+def _policy_grants(policy: str) -> dict:
+    from harness.policy import OutputPolicy
+
+    return OutputPolicy.parse(policy).grants
 
 
 def cmd_run(args) -> None:
@@ -180,6 +221,10 @@ def cmd_run(args) -> None:
             if bar is not None:
                 bar.finish(f"run {status}: {run.get('completed', 0)}/{run.get('total', '?')} prompts")
             _out(run)
+            if status == "collecting":
+                from dbe.checklist import next_step
+
+                print(f"No run yet. {next_step(client.status())}", file=sys.stderr)
             return
         time.sleep(args.interval)
 
@@ -298,7 +343,9 @@ def build_parser() -> argparse.ArgumentParser:
     add(sub, "pubkey", help="print the party public key").set_defaults(func=cmd_pubkey)
     add(sub, "verify", help="verify the enclave attestation and pin its TLS key").set_defaults(func=cmd_verify)
     add(sub, "identity", help="show the enclave's identity").set_defaults(func=cmd_identity)
-    add(sub, "status", help="show asset and approval state (signed)").set_defaults(func=cmd_status)
+    p = add(sub, "status", help="where the run stands and what happens next (signed)")
+    p.add_argument("--json", action="store_true", help="raw status document")
+    p.set_defaults(func=cmd_status)
     add(sub, "healthz", help="enclave health").set_defaults(func=cmd_healthz)
 
     model = add(sub, "model", help="model owner actions").add_subparsers(dest="model_command", required=True)
@@ -316,7 +363,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_benchmark_upload)
 
     add(sub, "manifest", help="show the run manifest both parties sign").set_defaults(func=cmd_manifest)
-    add(sub, "approve", help="sign the current manifest; the run starts on the second approval").set_defaults(func=cmd_approve)
+    p = add(sub, "approve", help="sign the current manifest; the run starts on the second approval")
+    p.add_argument("--without-adapter", action="store_true", help="approve a base-model run even though no adapter was uploaded")
+    p.set_defaults(func=cmd_approve)
 
     p = add(sub, "run", help="show run progress")
     p.add_argument("--wait", action="store_true")

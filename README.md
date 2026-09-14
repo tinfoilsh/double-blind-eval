@@ -33,38 +33,55 @@ This checks the enclave's signature, both approvals, and that the receipt's conf
 
 ## Run an evaluation
 
-Each party needs a key. Its public half goes into the enclave's config, so the enclave only listens to the two parties it was built for.
+Two parties, five steps. Uploads first, approvals last. At any point, `dbe status` shows what is in, what is missing, and who acts next.
+
+Each party has a key. Its public half is in the enclave's config, so the enclave only listens to the two parties it was built for. (`dbe keygen --party benchmark-owner` makes a new one; a new key means a new release.)
+
+**1. Both parties verify the enclave.**
 
 ```sh
-dbe keygen --party benchmark-owner    # or model-owner
+export DBE_ENCLAVE=dbe.tinfoil.containers.tinfoil.dev
+dbe verify
 ```
 
-**Benchmark owner**
+**2. Both parties upload, in either order.**
 
 ```sh
+# benchmark owner
 export DBE_PARTY=benchmark-owner
-dbe verify
-dbe benchmark upload prompts.csv
-dbe approve
-dbe results --out results.json
+bench/fetch_ailuminate_demo.sh                       # MLCommons AILuminate sample, or bring your own CSV
+dbe benchmark upload bench/ailuminate_demo_sample.csv
+
+# model owner
+export DBE_PARTY=model-owner
+bench/fetch_demo_adapter.sh                          # a public LoRA for gemma-4-31B-it, or bring your own
+dbe model upload demo-adapter/
 ```
 
-**Model owner**
+**3. Both parties check what will run.**
 
 ```sh
-export DBE_PARTY=model-owner
-dbe verify
-bench/fetch_demo_adapter.sh          # a public LoRA adapter for gemma-4-31B-it, into ./demo-adapter
-dbe model upload demo-adapter/       # or your own PEFT LoRA directory
-dbe approve
-dbe receipt get --out receipt.json
+dbe status      # checklist: both uploads in? who has approved?
+dbe manifest    # the exact hash you are about to sign; compare it with the other party
 ```
 
-The run starts once both have approved. Results go to the benchmark owner; the model owner gets a signed receipt.
-`dbe manifest` shows exactly what you are approving.
+**4. Both parties approve, in either order.**
 
-Prompts are a CSV with a `prompt_text` column; `bench/fetch_ailuminate_demo.sh` pulls the MLCommons AILuminate demo set into `bench/ailuminate_demo_sample.csv`.
-An adapter is a PEFT LoRA directory (`adapter_config.json` plus weights) trained on `google/gemma-4-31B-it`; `dbe model hash demo-adapter/` prints the identity the receipt will carry.
+```sh
+dbe approve
+```
+
+`dbe approve` refuses to run before both uploads are in. The run starts the moment the second approval lands. If either party re-uploads after that, both approvals are dropped and step 4 repeats.
+
+**5. Collect.**
+
+```sh
+dbe run --wait                          # either party
+dbe results --out results.json          # benchmark owner: completions, timing, receipt
+dbe receipt get --out receipt.json      # model owner: receipt only
+```
+
+Prompts are a CSV with a `prompt_text` column. An adapter is a PEFT LoRA directory (`adapter_config.json` plus weights) trained on `google/gemma-4-31B-it`; `dbe model hash demo-adapter/` prints the identity the receipt will carry.
 
 ## Follow along in a notebook
 

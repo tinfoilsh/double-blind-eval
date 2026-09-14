@@ -32,10 +32,12 @@ model_owner = [
     ("code", 'dbe("verify")'),
     ("md", "## 2. Upload the private adapter\n\nA PEFT adapter directory (`adapter_config.json` + `adapter_model.safetensors`) or a `.tar.gz` of one. It is held in enclave memory and loaded into vLLM; it never touches the host disk. The cell below fetches a public LoRA adapter for gemma-4-31B-it to stand in for a private one; point `DBE_ADAPTER` at your own directory instead if you have one."),
     ("code", 'ADAPTER_PATH = os.environ.get("DBE_ADAPTER", "demo-adapter")\nif not os.path.exists(os.path.join(ADAPTER_PATH, "adapter_config.json")):\n    subprocess.run(["bash", "bench/fetch_demo_adapter.sh", ADAPTER_PATH], check=True)\ndbe("model", "hash", ADAPTER_PATH)\ndbe("model", "upload", ADAPTER_PATH)'),
-    ("md", "## 3. Review and approve the run manifest\n\nThe manifest names the adapter hash, the benchmark hash, the sampling parameters and the output policy. Compare `manifest_sha256` with the benchmark owner out of band, then sign it. The run starts when both parties have approved."),
+    ("md", "## 3. Check that both uploads are in\n\nApprovals come last. `dbe status` shows whether the benchmark owner's prompt set has landed and who has approved so far. Re-run this cell until both uploads show `[x]`."),
+    ("code", 'dbe("status")'),
+    ("md", "## 4. Review and approve the run manifest\n\nThe manifest names the adapter hash, the benchmark hash, the sampling parameters and the output policy. Compare `manifest_sha256` with the benchmark owner out of band, then sign it. Either party may approve first; the run starts the moment the second approval lands. `dbe approve` refuses to run before both uploads are in, and any re-upload afterwards drops both approvals."),
     ("code", 'dbe("manifest")'),
     ("code", 'dbe("approve")'),
-    ("md", "## 4. Wait for the run and collect the receipt\n\nThe output policy gives the model owner the receipt only: proof of what ran, signed by the enclave."),
+    ("md", "## 5. Wait for the run and collect the receipt\n\nThe output policy gives the model owner the receipt only: proof of what ran, signed by the enclave."),
     ("code", 'dbe("run", "--wait")\ndbe("receipt", "get", "--out", "receipt.json")\ndbe("receipt", "verify", "receipt.json", "--tag", TAG)'),
 ]
 
@@ -46,10 +48,12 @@ benchmark_owner = [
     ("code", 'dbe("verify")'),
     ("md", "## 2. Prepare and upload the prompt set\n\nThe sample below is the MLCommons AILuminate demo set, cut to the first prompt per hazard exactly as OpenMined's demo did. Any CSV with `prompt_text` (or JSONL with `prompt` and optional `expected`) works."),
     ("code", '!bash bench/fetch_ailuminate_demo.sh bench/ailuminate_demo_sample.csv\nBENCH = os.environ.get("DBE_BENCH", "bench/ailuminate_demo_sample.csv")\ndbe("benchmark", "upload", BENCH)'),
-    ("md", "## 3. Review and approve the run manifest"),
+    ("md", "## 3. Check that both uploads are in\n\nApprovals come last. `dbe status` shows whether the model owner's adapter has landed and who has approved so far. Re-run this cell until both uploads show `[x]`."),
+    ("code", 'dbe("status")'),
+    ("md", "## 4. Review and approve the run manifest\n\nCompare `manifest_sha256` with the model owner out of band, then sign it. Either party may approve first; the run starts the moment the second approval lands. `dbe approve` refuses to run before both uploads are in, and any re-upload afterwards drops both approvals."),
     ("code", 'dbe("manifest")'),
     ("code", 'dbe("approve")'),
-    ("md", "## 4. Read the results\n\nPer prompt: completion, time to first token, decode tokens per second. If the benchmark had an `expected` column the exact-match score is included. The receipt is signed by the enclave and carries both approvals."),
+    ("md", "## 5. Read the results\n\nPer prompt: completion, time to first token, decode tokens per second. If the benchmark had an `expected` column the exact-match score is included. The receipt is signed by the enclave and carries both approvals."),
     ("code", 'dbe("run", "--wait")\ndbe("results", "--out", "results.json", "--show")\nreceipt = json.load(open("results.json"))["receipt"]\njson.dump(receipt, open("receipt.json", "w"), indent=2)\ndbe("receipt", "verify", "receipt.json", "--tag", TAG)'),
 ]
 
