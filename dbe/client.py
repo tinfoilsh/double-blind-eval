@@ -193,7 +193,17 @@ class EnclaveClient:
         assert self.session is not None
         return PinnedHTTPSConnection(self.session.enclave, self.session.tls_public_key_sha256, timeout=self.timeout)
 
-    def request(self, method: str, path: str, body: bytes = b"", content_type: str = "application/octet-stream", signed: bool = True, extra_headers: dict | None = None):
+    def request(
+        self,
+        method: str,
+        path: str,
+        body: bytes = b"",
+        content_type: str = "application/octet-stream",
+        signed: bool = True,
+        extra_headers: dict | None = None,
+        progress=None,
+    ):
+        """Send one request. `progress(sent, total)` is called as a large body streams out."""
         headers = {"Content-Type": content_type, "Content-Length": str(len(body)), "Accept": "application/json"}
         if extra_headers:
             headers.update(extra_headers)
@@ -208,7 +218,20 @@ class EnclaveClient:
             headers[HEADER_SIGNATURE] = sign(self.key, request_signing_input(method, path, sha256_hex(body), timestamp, nonce))
         conn = self._connection()
         try:
-            conn.request(method, path, body=body, headers=headers)
+            if progress is None or len(body) < 512 * 1024:
+                conn.request(method, path, body=body, headers=headers)
+            else:
+                conn.putrequest(method, path, skip_accept_encoding=True)
+                for name, value in headers.items():
+                    conn.putheader(name, value)
+                conn.endheaders()
+                view, sent, chunk = memoryview(body), 0, 256 * 1024
+                progress(0, len(body))
+                while sent < len(body):
+                    piece = view[sent : sent + chunk]
+                    conn.send(piece)
+                    sent += len(piece)
+                    progress(sent, len(body))
             resp = conn.getresponse()
             data = resp.read()
         finally:
@@ -237,9 +260,9 @@ class EnclaveClient:
     def run(self):
         return self.request("GET", "/api/run")[1]
 
-    def upload_adapter(self, path: Path):
+    def upload_adapter(self, path: Path, progress=None):
         data = pack_adapter(Path(path))
-        return self.request("PUT", "/api/model/adapter", data, content_type="application/x-tar")[1]
+        return self.request("PUT", "/api/model/adapter", data, content_type="application/x-tar", progress=progress)[1]
 
     def upload_benchmark(self, path: Path):
         path = Path(path)
