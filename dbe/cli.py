@@ -43,11 +43,21 @@ def _load_key(party: str, explicit_path: str | None):
     if explicit_path:
         return read_private_key(Path(explicit_path).expanduser())
     for var in (ENV_KEY_VARS[party], "DBE_PRIVATE_KEY"):
-        inline = os.environ.get(var, "").strip()
+        inline = os.environ.get(var, "").strip().strip("\"'")
         if inline:
-            return load_private_key_hex(inline)
+            try:
+                return load_private_key_hex(inline)
+            except ValueError:
+                shown = inline if len(inline) <= 12 else inline[:8] + "…"
+                raise SystemExit(
+                    f"{var} is set but is not a private key: expected 64 hex characters, got {len(inline)} character(s) starting {shown!r}. "
+                    "Paste the exact value from the credentials you were given, with no quotes or placeholder text."
+                ) from None
     path = _key_path(party, None)
-    return read_private_key(path) if path.exists() else None
+    try:
+        return read_private_key(path) if path.exists() else None
+    except ValueError as exc:
+        raise SystemExit(f"{path} does not contain a valid private key: {exc}") from None
 
 
 def _client(args) -> EnclaveClient:
@@ -431,7 +441,7 @@ def main(argv: list[str] | None = None) -> None:
     args = resolve_options(build_parser().parse_args(argv))
     try:
         args.func(args)
-    except (APIError, VerificationError, PinMismatch, FileNotFoundError) as exc:
+    except (APIError, VerificationError, PinMismatch, FileNotFoundError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 

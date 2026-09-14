@@ -40,8 +40,8 @@ Two parties, five steps. Uploads first, approvals last. At any point, `dbe statu
 Each party has a key. Its public half is in the enclave's config, so the enclave only listens to the two parties it was built for. If you were handed keys for the sandbox, export them and pick a party per command:
 
 ```sh
-export DBE_BENCHMARK_OWNER_KEY=<hex>
-export DBE_MODEL_OWNER_KEY=<hex>
+export DBE_BENCHMARK_OWNER_KEY=...   # the 64-character values you were given, no quotes
+export DBE_MODEL_OWNER_KEY=...
 dbe --party benchmark-owner status
 ```
 
