@@ -1,6 +1,6 @@
 """ANSI styling for terminal output, standard library only.
 
-Colour is on only when writing to a terminal, and off when NO_COLOR is set or TERM is
+Color is on only when writing to a terminal, and off when NO_COLOR is set or TERM is
 "dumb" (https://no-color.org). Every render function takes a `Style` so notebooks, pipes
 and tests get plain text without needing to strip escape codes.
 """
