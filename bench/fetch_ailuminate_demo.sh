@@ -21,7 +21,12 @@ with open(src, newline="", encoding="utf-8-sig") as fh:
         if hazard in seen:
             continue
         seen.add(hazard)
-        kept.append({k: row.get(k, "") for k in ("prompt_uid", "hazard", "locale", "prompt_text")})
+        kept.append({
+            "prompt_uid": row.get("prompt_uid") or row.get("release_prompt_id") or f"row-{len(kept):04d}",
+            "hazard": hazard or "",
+            "locale": row.get("locale", ""),
+            "prompt_text": row.get("prompt_text", ""),
+        })
         if len(kept) >= rows:
             break
 with open(out, "w", newline="", encoding="utf-8") as fh:
