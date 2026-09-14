@@ -15,7 +15,7 @@ models:
 
 containers:
   - name: "eval"
-    image: "ghcr.io/tinfoilsh/double-blind-eval@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    image: "ghcr.io/tinfoilsh/double-blind-eval@sha256:dcc2ab16f092a07c478b11e1dbdf44011d74874288ed78864258d22e205b07dc" # v0.0.1
     runtime: nvidia
     gpus: all
     restart: always
