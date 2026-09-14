@@ -7,6 +7,7 @@ CLI, notebooks and any future UI tell the same story.
 from __future__ import annotations
 
 from dbe.canonical import BENCHMARK_OWNER, MODEL_OWNER
+from dbe.style import PLAIN, Style
 
 PRETTY = {BENCHMARK_OWNER: "benchmark owner", MODEL_OWNER: "model owner"}
 
@@ -50,28 +51,34 @@ def next_step(status: dict) -> str:
     return "Both approvals recorded; the run is starting."
 
 
-def render_checklist(status: dict, enclave: str | None = None) -> str:
+def render_checklist(status: dict, enclave: str | None = None, s: Style = PLAIN) -> str:
     bench = status.get("benchmark") or {}
     adapter = status.get("adapter") or {}
     approvals = status.get("approvals") or {}
     lines = []
     if enclave:
-        lines.append(f"{enclave}  (phase: {status.get('phase', '?')})")
+        phase = f"(phase: {status.get('phase', '?')})"
+        lines.append(f"{s.heading(enclave)}  {s.dim(phase)}")
+        lines.append("")
     lines.append(
-        f"  [{'x' if bench else ' '}] prompt set uploaded      "
-        + (f"{bench.get('count')} prompts, sha256 {_short(bench.get('sha256'))}" if bench else "benchmark owner has not uploaded yet")
+        f"  {s.check(bool(bench))} {s.bold('prompt set uploaded')}      "
+        + (f"{bench.get('count')} prompts, sha256 {_short(bench.get('sha256'))}" if bench else s.dim("benchmark owner has not uploaded yet"))
     )
     lines.append(
-        f"  [{'x' if adapter else ' '}] adapter uploaded         "
-        + (f"content hash {_short(adapter.get('sha256'))}, served as {adapter.get('lora_name')}" if adapter else "model owner has not uploaded yet (a run without one uses the base model)")
+        f"  {s.check(bool(adapter))} {s.bold('adapter uploaded')}         "
+        + (f"content hash {_short(adapter.get('sha256'))}, served as {adapter.get('lora_name')}" if adapter else s.dim("model owner has not uploaded yet (a run without one uses the base model)"))
     )
-    lines.append(f"  manifest {_short(status.get('manifest_sha256'), 16)}   both parties approve this exact hash")
+    lines.append("")
+    lines.append(f"  {s.bold('manifest')} {s.cyan(_short(status.get('manifest_sha256'), 16))}   {s.dim('both parties approve this exact hash')}")
     for party in (BENCHMARK_OWNER, MODEL_OWNER):
-        lines.append(f"  [{'x' if approvals.get(party) else ' '}] {PRETTY[party]} approved")
+        lines.append(f"  {s.check(bool(approvals.get(party)))} {s.bold(f'{PRETTY[party]} approved')}")
     run = status.get("run")
     if run:
-        lines.append(f"  run {run.get('run_id', '')[:12]}… {run.get('status')}, {run.get('completed', 0)}/{run.get('total', '?')} prompts")
-    lines.append(f"Next: {next_step(status)}")
+        lines.append("")
+        lines.append(f"  {s.bold('run')} {run.get('run_id', '')[:12]}… {run.get('status')}, {run.get('completed', 0)}/{run.get('total', '?')} prompts")
+    lines.append("")
+    lines.append(s.box("Next", next_step(status)))
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -118,7 +125,7 @@ def describe_policy(policy_source: str | None) -> str:
     return ", ".join(parts)
 
 
-def render_verify(record: dict, identity: dict, enclave: str, repo: str, tag: str | None) -> str:
+def render_verify(record: dict, identity: dict, enclave: str, repo: str, tag: str | None, s: Style = PLAIN) -> str:
     """Plain-language summary of a successful `dbe verify`."""
     enclave_quote = (record.get("measurements") or {}).get("enclave") or {}
     platform = platform_name(enclave_quote.get("type"))
@@ -127,18 +134,19 @@ def render_verify(record: dict, identity: dict, enclave: str, repo: str, tag: st
     base = identity.get("base_model") or {}
     parties = identity.get("parties") or {}
     release = f"{tag} of {repo}" if tag else f"latest release of {repo}"
+    ok = s.green("\u2713")
     lines = [
-        f"Verifying {enclave}",
+        f"Verifying {s.heading(enclave)}",
         "",
-        f"  \u2713 Release      {release}, measurement published to Sigstore (digest {_short(digest, 8)})",
-        f"  \u2713 Hardware     {platform} attestation, checked against the vendor's certificate chain",
-        "  \u2713 Code         the enclave's measurement matches that release",
-        f"  \u2713 Connection   TLS key {_short(tls, 8)} pinned; every later command can only reach this enclave",
+        f"  {ok} {s.bold('Release')}      {release}, measurement published to Sigstore (digest {s.cyan(_short(digest, 8))})",
+        f"  {ok} {s.bold('Hardware')}     {platform} attestation, checked against the vendor's certificate chain",
+        f"  {ok} {s.bold('Code')}         the enclave's measurement matches that release",
+        f"  {ok} {s.bold('Connection')}   TLS key {s.cyan(_short(tls, 8))} pinned; every later command can only reach this enclave",
         "",
-        f"  Model          {base.get('repo') or base.get('name') or '?'} (weights {_short(base.get('roothash'), 8)})",
-        f"  Output policy  {describe_policy(identity.get('output_policy_source'))}",
-        f"  Parties        benchmark owner {_short(parties.get(BENCHMARK_OWNER), 8)}, model owner {_short(parties.get(MODEL_OWNER), 8)}",
+        f"  {s.bold('Model')}          {base.get('repo') or base.get('name') or '?'} (weights {s.cyan(_short(base.get('roothash'), 8))})",
+        f"  {s.bold('Output policy')}  {describe_policy(identity.get('output_policy_source'))}",
+        f"  {s.bold('Parties')}        benchmark owner {s.cyan(_short(parties.get(BENCHMARK_OWNER), 8))}, model owner {s.cyan(_short(parties.get(MODEL_OWNER), 8))}",
         "",
-        "Verified. `dbe status` shows where the run stands; `dbe verify --full` prints every hash.",
+        f"{s.green(s.bold('Verified.'))} {s.dim('`dbe status` shows where the run stands; `dbe verify --full` prints every hash.')}",
     ]
     return "\n".join(lines)

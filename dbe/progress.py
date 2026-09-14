@@ -10,6 +10,8 @@ import sys
 import threading
 import time
 
+from dbe.style import PLAIN, detect
+
 
 def human_bytes(n: float) -> str:
     for unit in ("B", "KB", "MB", "GB"):
@@ -26,9 +28,11 @@ class ProgressBar:
         self.width = width
         self.stream = stream or sys.stderr
         self.live = force or bool(getattr(self.stream, "isatty", lambda: False)())
+        self.style = detect(self.stream) if self.live else PLAIN
         self.started = time.monotonic()
         self.finished = False
         self._last = None
+        self._last_width = 0
 
     def _fmt(self, value: float) -> str:
         return human_bytes(value) if self.unit == "bytes" else f"{int(value)}"
@@ -39,11 +43,13 @@ class ProgressBar:
         total = max(total, 1)
         frac = min(max(done / total, 0.0), 1.0)
         filled = int(round(frac * self.width))
-        line = f"\r{self.label} [{'#' * filled}{'.' * (self.width - filled)}] {frac * 100:3.0f}%  {self._fmt(done)}/{self._fmt(total)}"
+        counts = f"{frac * 100:3.0f}%  {self._fmt(done)}/{self._fmt(total)}"
+        line = f"\r{self.label} [{self.style.green('#' * filled)}{self.style.dim('.' * (self.width - filled))}] {self.style.bold(counts[:4])}{counts[4:]}"
         if self.live and line != self._last:
             self.stream.write(line)
             self.stream.flush()
             self._last = line
+            self._last_width = len(self.label) + self.width + len(counts) + 4
 
     def finish(self, message: str | None = None) -> None:
         if self.finished:
@@ -52,7 +58,8 @@ class ProgressBar:
         elapsed = time.monotonic() - self.started
         summary = message or f"{self.label}: done in {elapsed:.1f}s"
         if self.live:
-            self.stream.write("\r" + " " * (len(self._last) if self._last else 0) + "\r")
+            self.stream.write("\r" + " " * self._last_width + "\r")
+            summary = f"{self.style.green(chr(0x2713))} {summary}"
         self.stream.write(summary + "\n")
         self.stream.flush()
 
@@ -66,6 +73,7 @@ class Spinner:
         self.message = message
         self.stream = stream or sys.stderr
         self.live = force or bool(getattr(self.stream, "isatty", lambda: False)())
+        self.style = detect(self.stream) if self.live else PLAIN
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.started: float | None = None
@@ -84,7 +92,7 @@ class Spinner:
     def _spin(self) -> None:
         i = 0
         while not self._stop.is_set():
-            self.stream.write(f"\r{self.message} {self.FRAMES[i % len(self.FRAMES)]} {time.monotonic() - self.started:4.0f}s")
+            self.stream.write(f"\r{self.message} {self.style.cyan(self.FRAMES[i % len(self.FRAMES)])} {self.style.dim(f'{time.monotonic() - self.started:4.0f}s')}")
             self.stream.flush()
             i += 1
             self._stop.wait(0.15)
@@ -97,7 +105,10 @@ class Spinner:
             self._thread.join(timeout=1.0)
             self.stream.write("\r" + " " * (len(self.message) + 12) + "\r")
         elapsed = time.monotonic() - self.started
-        self.stream.write((message or f"{self.message}: done in {elapsed:.1f}s") + "\n")
+        summary = message or f"{self.message}: done in {elapsed:.1f}s"
+        if self.live:
+            summary = f"{self.style.green(chr(0x2713))} {summary}"
+        self.stream.write(summary + "\n")
         self.stream.flush()
         self.started = None
         self._thread = None
