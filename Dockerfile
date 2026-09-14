@@ -19,7 +19,8 @@ COPY entrypoint.sh /opt/dbe/entrypoint.sh
 RUN set -eux; \
     chmod 0755 /opt/dbe/entrypoint.sh; \
     find /opt/dbe -name '__pycache__' -type d -exec rm -rf {} + || true; \
-    cd /opt/dbe && python3 -c "import harness.app, dbe.canonical; print('harness import ok')"
+    cd /opt/dbe && python3 -c "import harness.app, dbe.canonical; print('harness import ok')"; \
+    test -f /vllm-workspace/examples/tool_chat_template_gemma4.jinja
 
 ENV PYTHONPATH=/opt/dbe \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -30,5 +31,7 @@ LABEL org.opencontainers.image.source="https://github.com/tinfoilsh/double-blind
       org.opencontainers.image.version="${VERSION}" \
       com.tinfoil.base-image="confidential-gemma4-31b@sha256:cb45fc53829f73b588c26fa9ca6c90be122367a64e3b835ce4571a4e5f839d89"
 
-WORKDIR /opt/dbe
+# Same working directory as the production image: vLLM's relative paths
+# (chat template) resolve from here.
+WORKDIR /vllm-workspace
 ENTRYPOINT ["/opt/dbe/entrypoint.sh"]
