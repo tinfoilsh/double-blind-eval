@@ -122,10 +122,23 @@ uv run pytest
 uv run python tests/smoke_cli.py   # the real CLI against the harness with a fake engine
 ```
 
+## New to Tinfoil Containers?
+
+This repo is also a complete, small example of one. The whole deployment is the one file
+`tinfoil-config.yml`: which image runs, its environment and command, how much GPU it gets, and
+which paths are reachable from outside. A GitHub release measures that file and publishes the
+expected enclave measurement; `dbe verify` checks a live enclave against it on your own machine.
+No inbound network is open except the paths listed, no egress exists unless declared, and the
+operator never sees inside.
+
+[docs/TINFOIL-CONTAINERS.md](docs/TINFOIL-CONTAINERS.md) maps Confidential Space concepts to
+Tinfoil ones and walks through this repo's config line by line.
+
 ## Learn more
 
+- [Tinfoil Containers, as used in this repo](docs/TINFOIL-CONTAINERS.md): a primer, with a Confidential Space mapping
 - [How the protocol works](docs/PROTOCOL.md): signing, manifests, approvals, output policy
 - [What a receipt proves](docs/RECEIPT.md)
-- `tinfoil-config.yml`: everything the enclave is measured on
+- [Tinfoil Containers documentation](https://docs.tinfoil.sh/containers/overview)
 
 Apache-2.0.
