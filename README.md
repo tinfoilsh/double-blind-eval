@@ -7,10 +7,10 @@ A live instance runs at `dbe.tinfoil.containers.tinfoil.dev`.
 
 ## Quickstart
 
-You need Python 3.11+ and the [`tinfoil` CLI](https://docs.tinfoil.sh/containers/cli).
+You need [uv](https://docs.astral.sh/uv/getting-started/installation/) and the [`tinfoil` CLI](https://docs.tinfoil.sh/containers/cli).
 
 ```sh
-pip install git+https://github.com/tinfoilsh/double-blind-eval
+uv tool install git+https://github.com/tinfoilsh/double-blind-eval
 export DBE_ENCLAVE=dbe.tinfoil.containers.tinfoil.dev
 ```
 
@@ -70,9 +70,8 @@ There is one notebook per party, with the same steps as above and a short explan
 
 ```sh
 git clone https://github.com/tinfoilsh/double-blind-eval && cd double-blind-eval
-pip install -e . jupyter
 export DBE_ENCLAVE=dbe.tinfoil.containers.tinfoil.dev
-jupyter notebook notebooks/
+uv run --group notebooks jupyter notebook notebooks/
 ```
 
 Open your party's notebook and run the cells top to bottom. Each cell calls the same `dbe` commands, so you can see what it did and repeat it on the command line.
@@ -83,6 +82,13 @@ Open your party's notebook and run the cells top to bottom. Each cell calls the 
 2. Put your two party public keys in `tinfoil-config.yml`.
 3. Run the **Tinfoil Release** workflow: `gh workflow run tinfoil-release.yml -f version=v0.1.0`
 4. Deploy: `tinfoil container create dbe --repo <you>/double-blind-eval --tag v0.1.0`
+
+## Develop
+
+```sh
+uv run pytest
+uv run python tests/smoke_cli.py   # the real CLI against the harness with a fake engine
+```
 
 ## Learn more
 
