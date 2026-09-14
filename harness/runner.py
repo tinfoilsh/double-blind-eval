@@ -52,7 +52,7 @@ class VLLMClient:
     async def healthy(self) -> bool:
         http = self._http()
         try:
-            resp = await http.get(f"{self.base_url}/health", timeout=5.0)
+            resp = await http.get(f"{self.base_url}/health", timeout=20.0)
             return resp.status_code == 200
         except httpx.HTTPError:
             return False
