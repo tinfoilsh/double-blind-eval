@@ -9,8 +9,10 @@ FROM ${BASE_IMAGE}
 ARG SOURCE_REVISION=unversioned
 ARG VERSION=unversioned
 
+# uv, pinned by digest, installs the one extra dependency the harness needs.
+COPY --from=ghcr.io/astral-sh/uv:0.12.13@sha256:b485bd65cc2cf1c9a93b3554012c9c3778cf7b1b5fd3d3096ce9e1226c97e1e6 /uv /bin/uv
 RUN set -eux; \
-    python3 -m pip install --no-cache-dir "cryptography>=42,<47"; \
+    uv pip install --system --no-cache "cryptography>=42,<47"; \
     python3 -c "import fastapi, uvicorn, httpx, yaml, cryptography; print('harness deps ok', fastapi.__version__, uvicorn.__version__, httpx.__version__, cryptography.__version__)"
 
 COPY dbe/ /opt/dbe/dbe/
