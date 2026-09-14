@@ -45,6 +45,8 @@ export DBE_MODEL_OWNER_KEY=...
 dbe --party benchmark-owner status
 ```
 
+To switch roles on the same terminal, export `DBE_PARTY` before running a command (`export DBE_PARTY=model-owner`); it takes the place of `--party` for every command that follows.
+
 > [!NOTE]
 > You do not need to create keys to run the demo; the sandbox keys above are all it takes.
 > Creating your own keys only matters if you deploy your own enclave, since the enclave is built for specific keys. See [Deploy your own](#deploy-your-own).
