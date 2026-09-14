@@ -25,3 +25,19 @@ def test_shared_options_work_before_the_subcommand_and_from_env(monkeypatch):
     args = parse(["--party", "mo", "status", "--party", "bo"], monkeypatch=monkeypatch)
     assert args.party == "bo"
     assert parse(["verify"], monkeypatch=monkeypatch).repo == "tinfoilsh/double-blind-eval"
+
+
+def test_private_key_from_environment(monkeypatch, tmp_path):
+    from dbe.canonical import generate_private_key, private_key_hex, public_key_hex
+    from dbe.cli import _load_key
+
+    key = generate_private_key()
+    monkeypatch.setenv("DBE_PRIVATE_KEY", private_key_hex(key))
+    loaded = _load_key("model-owner", None)
+    assert public_key_hex(loaded.public_key()) == public_key_hex(key.public_key())
+    monkeypatch.delenv("DBE_PRIVATE_KEY")
+    monkeypatch.setenv("DBE_HOME", str(tmp_path))
+    import dbe.client, dbe.cli
+
+    monkeypatch.setattr(dbe.cli, "DBE_HOME", tmp_path)
+    assert _load_key("model-owner", None) is None

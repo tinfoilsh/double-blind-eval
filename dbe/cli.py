@@ -12,6 +12,7 @@ from pathlib import Path
 
 from dbe.canonical import (
     generate_private_key,
+    load_private_key_hex,
     normalize_party,
     public_key_hex,
     read_private_key,
@@ -33,13 +34,18 @@ def _key_path(party: str, explicit: str | None) -> Path:
     return DBE_HOME / "keys" / f"{party}.key"
 
 
+def _load_key(party: str, explicit_path: str | None):
+    """Party key from DBE_PRIVATE_KEY (hex, for env files) or from a key file."""
+    inline = os.environ.get("DBE_PRIVATE_KEY", "").strip()
+    if inline:
+        return load_private_key_hex(inline)
+    path = _key_path(party, explicit_path)
+    return read_private_key(path) if path.exists() else None
+
+
 def _client(args) -> EnclaveClient:
     party = normalize_party(args.party) if args.party else None
-    key = None
-    if party:
-        path = _key_path(party, args.key)
-        if path.exists():
-            key = read_private_key(path)
+    key = _load_key(party, args.key) if party else None
     if args.dev_url:
         print(f"warning: --dev-url bypasses attestation verification; never use it against a real run", file=sys.stderr)
         return EnclaveClient(party=party, key=key, dev_url=args.dev_url)
@@ -64,7 +70,9 @@ def cmd_keygen(args) -> None:
 
 def cmd_pubkey(args) -> None:
     party = normalize_party(args.party)
-    key = read_private_key(_key_path(party, args.key))
+    key = _load_key(party, args.key)
+    if key is None:
+        raise SystemExit(f"no key for {party}: run `dbe keygen --party {party}` or set DBE_PRIVATE_KEY")
     print(public_key_hex(key.public_key()))
 
 
@@ -322,7 +330,7 @@ def _common_options() -> argparse.ArgumentParser:
     common.add_argument("-e", "--enclave", default=argparse.SUPPRESS, help="enclave hostname (env DBE_ENCLAVE)")
     common.add_argument("-r", "--repo", default=argparse.SUPPRESS, help="config repo (env DBE_REPO)")
     common.add_argument("--party", default=argparse.SUPPRESS, help="benchmark-owner | model-owner (env DBE_PARTY)")
-    common.add_argument("--key", default=argparse.SUPPRESS, help="party private key file (default ~/.dbe/keys/<party>.key)")
+    common.add_argument("--key", default=argparse.SUPPRESS, help="party private key file (default ~/.dbe/keys/<party>.key; or set DBE_PRIVATE_KEY to the key hex)")
     common.add_argument("--dev-url", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     return common
 
