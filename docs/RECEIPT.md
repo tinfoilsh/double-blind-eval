@@ -42,13 +42,19 @@ Canonical JSON is `json.dumps(obj, sort_keys=True, separators=(",", ":"))`.
 `dbe receipt verify receipt.json --tag v0.1.0` checks:
 
 1. the signature under `run_public_key`;
-2. that `run_public_key` equals the key `dbe verify` pinned for this enclave (if a session exists);
-3. both approvals: each party's signature over `dbe-approve-v1\n<manifest_sha256>` under the party key named in the receipt, and that both name the receipt's manifest;
-4. that `identity.config_sha256` equals the sha256 of `tinfoil-config.yml` at the given release tag, which is the file whose hash sits in the attested kernel command line.
+2. both approvals: each party's signature over `dbe-approve-v1\n<manifest_sha256>` under the party key named in the receipt, and that both name the receipt's manifest;
+3. that `identity.config_sha256` equals the sha256 of `tinfoil-config.yml` at the given release tag, which is the file whose hash sits in the attested kernel command line.
 
-Steps 1 to 3 need nothing but the file. Step 4 needs the public repo. Tying the receipt to
-genuine hardware is the job of `dbe verify` (or `tinfoil attestation verify`) at the time the
-run key was pinned; its JSON audit record can be stored next to the receipt.
+Steps 1 and 2 need nothing but the file. Step 3 needs the public repo.
+
+The run key is generated fresh at every enclave boot, so a receipt from an earlier run or an
+earlier deployment carries a different key than the enclave you verify today. That is expected,
+and the command says so rather than failing. If you are checking a receipt from a run you just
+took part in, `--require-live` additionally insists that its run key is the one your last
+`dbe verify` pinned. Tying a receipt to genuine hardware after the fact relies on whoever
+verified that enclave instance at the time; the JSON audit record from `tinfoil attestation
+verify` can be stored next to the receipt for that purpose. Binding the run key into the
+attestation report itself is a planned follow-up.
 
 ## What is not in a receipt
 

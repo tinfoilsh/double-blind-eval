@@ -110,10 +110,10 @@ def test_receipt_roundtrip_and_tamper_detection():
         "score": 0.5,
     }
     envelope = build_receipt(body, run_key)
-    assert verify_receipt(envelope, public_key_hex(run_key.public_key())) == []
+    assert verify_receipt(envelope) == []
+    assert envelope["receipt"]["run_public_key"] == public_key_hex(run_key.public_key())
     tampered = {**envelope, "receipt": {**envelope["receipt"], "score": 1.0}}
     assert any("signature" in p for p in verify_receipt(tampered))
-    assert any("pinned" in p for p in verify_receipt(envelope, "00" * 32))
     missing = {**envelope, "receipt": {**envelope["receipt"], "approvals": {k: v for k, v in body["approvals"].items() if k != "model-owner"}}}
     problems = verify_receipt(missing)
     assert any("model-owner" in p for p in problems)

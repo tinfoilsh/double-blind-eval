@@ -294,15 +294,23 @@ def cmd_receipt_verify(args) -> None:
     from harness.receipt import verify_receipt  # local import: the client package stays dependency-light
 
     envelope = json.loads(Path(args.file).read_text())
-    expected_run_key = None
+    pinned_run_key = None
     if args.enclave:
         try:
-            expected_run_key = Session.load(args.enclave).run_public_key
+            pinned_run_key = Session.load(args.enclave).run_public_key
         except VerificationError:
             pass
-    problems = verify_receipt(envelope, expected_run_public_key=expected_run_key)
+    problems = verify_receipt(envelope)
     body = envelope.get("receipt", {})
     identity = body.get("identity", {})
+    run_key = body.get("run_public_key")
+    run_key_note = ""
+    if pinned_run_key and run_key == pinned_run_key:
+        run_key_note = "  (the enclave you verified in this session)"
+    elif pinned_run_key:
+        run_key_note = "  (a different enclave instance than the one you last verified; normal for receipts from earlier runs)"
+        if args.require_live:
+            problems.append("run_public_key is not the enclave instance pinned by your last `dbe verify` (--require-live)")
     if args.tag:
         try:
             expected_cfg = _fetch_config_sha256(args.repo, args.tag)
@@ -319,13 +327,13 @@ def cmd_receipt_verify(args) -> None:
     print(f"base model   {identity.get('base_model', {}).get('repo')} roothash={identity.get('base_model', {}).get('roothash')}")
     print(f"adapter      {body.get('manifest', {}).get('adapter_sha256')}")
     print(f"benchmark    {body.get('manifest', {}).get('benchmark_sha256')}")
-    print(f"run key      {body.get('run_public_key')}" + ("  (matches pinned identity)" if expected_run_key and expected_run_key == body.get("run_public_key") else ""))
+    print(f"run key      {run_key}{run_key_note}")
     if problems:
         print("RECEIPT INVALID:")
         for p in problems:
             print(f"  - {p}")
         raise SystemExit(1)
-    print("RECEIPT OK: signature, both approvals and party keys verify")
+    print("RECEIPT OK: enclave signature, both approvals and party keys verify" + (", config matches the release" if args.tag else ""))
 
 
 # ----- parser -------------------------------------------------------------------------
@@ -404,6 +412,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = add(receipt, "verify", help="verify a receipt offline")
     p.add_argument("file")
     p.add_argument("--tag", help="release tag to compare config_sha256 against")
+    p.add_argument("--require-live", action="store_true", help="also require the receipt to come from the enclave instance pinned by your last `dbe verify`")
     p.set_defaults(func=cmd_receipt_verify)
     return parser
 

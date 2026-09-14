@@ -85,7 +85,8 @@ def test_full_double_blind_flow(client, bo, mo, fake_vllm):
 
     # the receipt verifies under the identity's run key and binds both approvals
     run_key = client.get("/api/identity").json()["run_public_key"]
-    assert verify_receipt(receipt, run_key) == []
+    assert verify_receipt(receipt) == []
+    assert receipt["receipt"]["run_public_key"] == run_key
     body = receipt["receipt"]
     assert body["manifest_sha256"] == manifest["manifest_sha256"]
     assert set(body["approvals"]) == {"benchmark-owner", "model-owner"}
