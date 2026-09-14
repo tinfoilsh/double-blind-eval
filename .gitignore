@@ -10,3 +10,4 @@ notebooks/.ipynb_checkpoints/
 bench/ailuminate*.csv
 results*.json
 receipt*.json
+demo-adapter/

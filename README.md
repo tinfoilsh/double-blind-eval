@@ -52,7 +52,8 @@ dbe results --out results.json
 ```sh
 export DBE_PARTY=model-owner
 dbe verify
-dbe model upload ./my-lora-adapter
+bench/fetch_demo_adapter.sh          # a public LoRA adapter for gemma-4-31B-it, into ./demo-adapter
+dbe model upload demo-adapter/       # or your own PEFT LoRA directory
 dbe approve
 dbe receipt get --out receipt.json
 ```
@@ -60,8 +61,8 @@ dbe receipt get --out receipt.json
 The run starts once both have approved. Results go to the benchmark owner; the model owner gets a signed receipt.
 `dbe manifest` shows exactly what you are approving.
 
-Prompts are a CSV with a `prompt_text` column (the MLCommons AILuminate demo set works as-is: `bench/fetch_ailuminate_demo.sh`).
-The adapter is a PEFT LoRA directory for `google/gemma-4-31B-it`.
+Prompts are a CSV with a `prompt_text` column; `bench/fetch_ailuminate_demo.sh` pulls the MLCommons AILuminate demo set into `bench/ailuminate_demo_sample.csv`.
+An adapter is a PEFT LoRA directory (`adapter_config.json` plus weights) trained on `google/gemma-4-31B-it`; `dbe model hash demo-adapter/` prints the identity the receipt will carry.
 
 ## Follow along in a notebook
 
